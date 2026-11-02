@@ -453,6 +453,189 @@
     async hapusDokumen(id) { perlu('sekretaris'); db.dokumen = db.dokumen.filter((d) => d.id !== id); return tunda(null); }
   });
 
+  // =================================================================
+  // BATCH 4 — data contoh kas & iuran
+  // =================================================================
+  (function () {
+    const NM = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const blnKini = new Date().getMonth() + 1;
+    const tgl = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(Math.min(d, 28)).padStart(2, '0')}`;
+    // Sebagian besar anggota bergabung sebelum tahun ini, dua orang bergabung tahun ini
+    db.anggota.forEach((a, i) => { a.tanggal_gabung = i === 22 ? tgl(TH, Math.max(blnKini - 2, 1), 5) : i === 23 ? tgl(TH, blnKini, 1) : tgl(TH - 2, 7, 1); });
+    db.iuran = []; db.kas = [];
+    const nb = {};
+    const noBukti = (j, t) => { const pre = `${j === 'masuk' ? 'BKM' : 'BKK'}-${String(t).slice(0, 4)}-`; nb[pre] = (nb[pre] || 0) + 1; return pre + String(nb[pre]).padStart(4, '0'); };
+    const tambahKasIuran = (i) => {
+      const a = db.anggota.find((x) => x.id === i.anggota_id);
+      db.kas.push({ id: 'kx' + i.id, no_bukti: `IUR-${i.tahun}${String(i.bulan).padStart(2, '0')}-${i.id.slice(-4)}`, tanggal: String(i.tanggal_bayar).slice(0, 10), jenis: 'masuk',
+        kategori: 'Iuran Anggota', uraian: `Iuran ${i.metode === 'transfer' ? 'transfer ' : ''}${a ? a.nama : ''} bulan ${i.bulan}/${i.tahun}`, nominal: i.nominal, ref_iuran_id: i.id, bukti_url: i.bukti_url || null, dibuat_pada: i.tanggal_bayar });
+    };
+    db.anggota.filter((a) => a.status_aktif).forEach((a, ai) => {
+      for (const y of [TH - 1, TH]) for (let m = 1; m <= (y < TH ? 12 : blnKini); m++) {
+        if (tgl(y, m, 28) < a.tanggal_gabung) continue;
+        const telat = y === TH && ((ai % 6 === 1 && m >= blnKini - 2) || (ai % 9 === 4 && m >= blnKini - 4) || (ai % 5 === 2 && m === blnKini) || (ai === 7 && m > 3));
+        if (telat || (y === TH && m === blnKini && ai % 3 === 0)) continue;
+        const id = `i${a.id}-${y}-${m}`;
+        const transfer = (ai + m) % 4 === 0;
+        const row = { id, anggota_id: a.id, tahun: y, bulan: m, nominal: 20000, status: 'lunas', metode: transfer ? 'transfer' : 'tunai',
+          bukti_url: transfer ? svgDoc('Bukti Transfer') : null, catatan: null, tanggal_bayar: tgl(y, m, 5 + (ai % 20)) + 'T09:00:00Z' };
+        db.iuran.push(row); tambahKasIuran(row);
+      }
+    });
+    // Bukti transfer menunggu verifikasi (terhubung ke pengajuan contoh)
+    const menunggu = [['a5', [blnKini]], ['a6', [blnKini - 1, blnKini].filter((x) => x >= 1)]];
+    menunggu.forEach(([aid, bl], k) => {
+      const ids = bl.map((m) => { db.iuran = db.iuran.filter((x) => !(x.anggota_id === aid && x.tahun === TH && x.bulan === m)); db.kas = db.kas.filter((x) => x.ref_iuran_id !== `i${aid}-${TH}-${m}`);
+        const id = `w${aid}-${m}`; db.iuran.push({ id, anggota_id: aid, tahun: TH, bulan: m, nominal: 20000, status: 'menunggu', metode: 'transfer', bukti_url: svgDoc('Bukti Transfer BRI'), catatan: k === 1 ? 'Transfer sekaligus 2 bulan' : null, tanggal_bayar: null }); return id; });
+      const u = db.pengguna.find((x) => x.anggota_id === aid);
+      const data = { tahun: TH, bulan: bl, nominal: 20000 * bl.length, iuran_ids: ids, alasan: k === 1 ? 'Transfer sekaligus 2 bulan' : undefined };
+      const ada = db.pengajuan.find((q) => q.jenis === 'bukti_bayar' && q.pengaju_id === (u && u.id) && q.status === 'menunggu');
+      const ringkasan = `Iuran ${bl.map((m) => NM[m - 1]).join(', ')} ${TH} (transfer)`;
+      if (ada) Object.assign(ada, { ringkasan, data_usulan: data, ref_id: ids[0] });
+      else if (u) db.pengajuan.unshift({ id: 'qb' + k, kode: 'REQ-' + TH + '-' + String(95 + k).padStart(4, '0'), jenis: 'bukti_bayar', pengaju_id: u.id, ringkasan, status: 'menunggu',
+        dibuat_pada: new Date(Date.now() - (k + 1) * 5 * 36e5).toISOString(), data_usulan: data, ref_id: ids[0], lampiran_url: svgDoc('Bukti Transfer BRI') });
+    });
+    // Pemasukan & pengeluaran lain
+    const lain = [
+      [TH - 1, 12, 20, 'keluar', 'Konsumsi', 'Konsumsi Rakor Akhir Tahun', 650000],
+      [TH, 1, 10, 'masuk', 'Donasi', 'Donasi alumni untuk O2SN', 1500000], [TH, 1, 18, 'keluar', 'Konsumsi', 'Konsumsi Rakor Awal Tahun', 450000],
+      [TH, 2, 8, 'keluar', 'ATK', 'ATK & penggandaan modul ajar', 275000], [TH, 3, 14, 'keluar', 'Kegiatan', 'Sewa GOR seleksi O2SN', 800000],
+      [TH, 3, 20, 'masuk', 'Sponsor', 'Sponsor koperasi guru Tegal Timur', 2000000], [TH, 4, 22, 'keluar', 'Hadiah', 'Trofi & medali seleksi O2SN', 1250000],
+      [TH, 5, 6, 'keluar', 'Transport', 'Transport kontingen O2SN kota', 900000], [TH, 6, 17, 'keluar', 'Sosial', 'Santunan duka anggota', 500000],
+      [TH, 7, 9, 'keluar', 'Kegiatan', 'Narasumber workshop kurikulum', 1000000], [TH, 8, 15, 'keluar', 'Konsumsi', 'Konsumsi workshop kurikulum', 720000],
+      [TH, 8, 17, 'keluar', 'Sosial', 'Partisipasi lomba HUT RI', 350000], [TH, 9, 12, 'masuk', 'Donasi', 'Hibah Korwil kegiatan PJOK', 1000000],
+      [TH, 9, 23, 'keluar', 'Konsumsi', 'Konsumsi Rakor Gugus', 300000], [TH, 10, 19, 'keluar', 'Kegiatan', 'Sertifikat & bahan workshop', 425000],
+      [TH, 10, 28, 'keluar', 'ATK', 'Cetak banner & spanduk', 180000], [TH, blnKini, 2, 'keluar', 'Konsumsi', 'Konsumsi rapat pengurus', 150000]
+    ];
+    lain.filter(([y, m]) => y < TH || m <= blnKini).forEach(([y, m, d, jenis, kategori, uraian, nominal], i) => {
+      const t = tgl(y, m, d);
+      db.kas.push({ id: 'km' + i, no_bukti: noBukti(jenis, t), tanggal: t, jenis, kategori, uraian, nominal, ref_iuran_id: null, bukti_url: jenis === 'keluar' ? svgDoc('Nota ' + kategori) : null, dibuat_pada: t + 'T10:00:00Z' });
+    });
+    // Saldo awal sebelum tahun lalu
+    db.kas.push({ id: 'k0', no_bukti: `BKM-${TH - 2}-0001`, tanggal: tgl(TH - 2, 12, 31), jenis: 'masuk', kategori: 'Saldo Awal', uraian: 'Saldo kas pengurus periode lalu', nominal: 3250000, ref_iuran_id: null, dibuat_pada: tgl(TH - 2, 12, 31) + 'T10:00:00Z' });
+    db.antrean = { menunggu: 0, terkirim: 37, gagal: 1 };
+
+    const tahunDari = (t) => Number(String(t).slice(0, 4));
+    const urutKas = (a, b) => a.tanggal.localeCompare(b.tanggal) || String(a.dibuat_pada).localeCompare(String(b.dibuat_pada));
+    const tunggakanDemo = () => {
+      const th = db.org.tahun_anggaran, batas = th < TH ? 12 : th > TH ? 0 : blnKini;
+      return db.anggota.filter((a) => a.status_aktif).map((a) => {
+        const bl = [];
+        for (let m = 1; m <= batas; m++) if (tgl(th, m, 28) >= a.tanggal_gabung && !db.iuran.some((i) => i.anggota_id === a.id && i.tahun === th && i.bulan === m && i.status === 'lunas')) bl.push(m);
+        return { anggota_id: a.id, nama: a.nama, sekolah: a.sekolah, no_hp: a.no_hp, email: a.email, tahun: th, bulan_tertunggak: bl, jumlah_bulan: bl.length, total_tunggakan: bl.length * db.org.nominal_iuran };
+      }).filter((r) => r.jumlah_bulan).sort((a, b) => b.jumlah_bulan - a.jumlah_bulan || a.nama.localeCompare(b.nama));
+    };
+    db.tunggakanDemo = tunggakanDemo;
+    const putuskanAsli = Data.putuskanPengajuan;
+
+    Object.assign(Data, {
+      async ringkasanKeuangan(tahun) {
+        perlu('ketua', 'wakil_ketua', 'bendahara');
+        const th = Number(tahun || db.org.tahun_anggaran);
+        const batas = th < TH ? 12 : th > TH ? 0 : blnKini;
+        const sum = (f) => db.kas.filter(f).reduce((s, k) => s + k.nominal, 0);
+        const awal = sum((k) => tahunDari(k.tanggal) < th && k.jenis === 'masuk') - sum((k) => tahunDari(k.tanggal) < th && k.jenis === 'keluar');
+        const masuk = sum((k) => tahunDari(k.tanggal) === th && k.jenis === 'masuk'), keluar = sum((k) => tahunDari(k.tanggal) === th && k.jenis === 'keluar');
+        const perKat = {};
+        db.kas.filter((k) => tahunDari(k.tanggal) === th).forEach((k) => { const key = k.jenis + '|' + k.kategori; perKat[key] = perKat[key] || { jenis: k.jenis, kategori: k.kategori, total: 0, jumlah: 0 }; perKat[key].total += k.nominal; perKat[key].jumlah++; });
+        let menunggakOrang = 0, menunggakBulan = 0;
+        db.anggota.filter((a) => a.status_aktif).forEach((a) => { let n = 0; for (let m = 1; m <= batas; m++) if (tgl(th, m, 28) >= a.tanggal_gabung && !db.iuran.some((i) => i.anggota_id === a.id && i.tahun === th && i.bulan === m && i.status === 'lunas')) n++; if (n) { menunggakOrang++; menunggakBulan += n; } });
+        const iu = db.iuran.filter((i) => i.tahun === th);
+        return tunda({ tahun: th, nominal_iuran: db.org.nominal_iuran, anggota_aktif: db.anggota.filter((a) => a.status_aktif).length, bulan_berjalan: batas,
+          saldo_awal: awal, pemasukan: masuk, pengeluaran: keluar, saldo_akhir: awal + masuk - keluar,
+          saldo_kini: sum((k) => k.jenis === 'masuk') - sum((k) => k.jenis === 'keluar'),
+          per_bulan: Array.from({ length: 12 }, (_, i) => ({ bulan: i + 1,
+            masuk: sum((k) => tahunDari(k.tanggal) === th && Number(k.tanggal.slice(5, 7)) === i + 1 && k.jenis === 'masuk'),
+            keluar: sum((k) => tahunDari(k.tanggal) === th && Number(k.tanggal.slice(5, 7)) === i + 1 && k.jenis === 'keluar'),
+            lunas: iu.filter((x) => x.bulan === i + 1 && x.status === 'lunas').length, menunggu: iu.filter((x) => x.bulan === i + 1 && x.status === 'menunggu').length })),
+          per_kategori: Object.values(perKat).sort((a, b) => a.jenis.localeCompare(b.jenis) || b.total - a.total),
+          iuran: { lunas: iu.filter((x) => x.status === 'lunas').length, terkumpul: iu.filter((x) => x.status === 'lunas').reduce((s, x) => s + x.nominal, 0),
+            menunggu: iu.filter((x) => x.status === 'menunggu').length, menunggak: menunggakOrang, bulan_tertunggak: menunggakBulan } }, 300);
+      },
+      async kasDaftar(tahun) { perlu('ketua', 'bendahara'); return tunda(db.kas.filter((k) => tahunDari(k.tanggal) === Number(tahun)).sort(urutKas), 300); },
+      async simpanKas(row) {
+        perlu('bendahara');
+        if (!(Number(row.nominal) > 0)) throw new Error('Nominal harus lebih dari 0.');
+        const d = { tanggal: row.tanggal, jenis: row.jenis, kategori: row.kategori || 'Lainnya', uraian: row.uraian, nominal: Number(row.nominal), bukti_url: row.bukti_url || null };
+        if (row.id) {
+          const k = db.kas.find((x) => x.id === row.id);
+          if (k.ref_iuran_id) throw new Error('Transaksi ini berasal dari pembayaran iuran. Koreksi lewat menu Iuran Anggota (batalkan lunas).');
+          Object.assign(k, d); return tunda(k);
+        }
+        const baru = Object.assign({}, d, { id: 'km' + Date.now(), no_bukti: noBukti(d.jenis, d.tanggal), ref_iuran_id: null, dibuat_pada: new Date().toISOString() });
+        db.kas.push(baru); return tunda(baru, 350);
+      },
+      async hapusKas(id) {
+        perlu('bendahara');
+        const k = db.kas.find((x) => x.id === id);
+        if (k && k.ref_iuran_id) throw new Error('Transaksi ini berasal dari pembayaran iuran. Koreksi lewat menu Iuran Anggota (batalkan lunas).');
+        db.kas = db.kas.filter((x) => x.id !== id); return tunda(null);
+      },
+      async iuranRekap(tahun) {
+        perlu('ketua', 'bendahara');
+        return tunda({ anggota: db.anggota.filter((a) => a.status_aktif).sort((a, b) => a.nama.localeCompare(b.nama)).map((a) => ({ id: a.id, nama: a.nama, sekolah: a.sekolah, no_hp: a.no_hp, email: a.email, foto_url: a.foto_url, tanggal_gabung: a.tanggal_gabung })),
+          iuran: db.iuran.filter((i) => i.tahun === Number(tahun)) }, 350);
+      },
+      async tandaiLunas(aid, tahun, bulan) {
+        perlu('bendahara');
+        const ada = db.iuran.find((i) => i.anggota_id === aid && i.tahun === tahun && i.bulan === bulan);
+        if (ada && ada.status === 'lunas') throw new Error('Iuran bulan tersebut sudah lunas.');
+        const row = Object.assign(ada || { id: 'i' + Date.now() + Math.random().toString(36).slice(2, 6), anggota_id: aid, tahun, bulan, nominal: db.org.nominal_iuran },
+          { status: 'lunas', metode: 'tunai', tanggal_bayar: new Date().toISOString() });
+        if (!ada) db.iuran.push(row);
+        row.tanggal_bayar = hari(0) + 'T' + new Date().toISOString().slice(11);
+        tambahKasIuran(row);
+        return tunda({ ok: true, iuran: row }, 160);
+      },
+      async batalkanLunas(id) {
+        perlu('bendahara');
+        if (!db.iuran.some((i) => i.id === id)) throw new Error('Data iuran tidak ditemukan.');
+        db.kas = db.kas.filter((k) => k.ref_iuran_id !== id); db.iuran = db.iuran.filter((i) => i.id !== id);
+        return tunda({ ok: true }, 160);
+      },
+      async iuranSaya(tahun) { return tunda(db.iuran.filter((i) => i.anggota_id === Auth.profil.anggota_id && i.tahun === Number(tahun))); },
+      async ajukanBuktiIuran(tahun, bulan, bukti_url) {
+        const aid = Auth.profil.anggota_id;
+        if (!aid) throw new Error('Akun Anda belum ditautkan ke data anggota.');
+        const bl = [...new Set(bulan)].sort((a, b) => a - b);
+        if (!bl.length) throw new Error('Pilih minimal satu bulan.');
+        if (!bukti_url) throw new Error('Unggah bukti transfer terlebih dahulu.');
+        bl.forEach((m) => { const x = db.iuran.find((i) => i.anggota_id === aid && i.tahun === tahun && i.bulan === m); if (x && x.status !== 'ditolak') throw new Error(`Iuran ${NM[m - 1]} ${tahun} sudah lunas atau sedang diverifikasi.`); });
+        const catatan = arguments[3] || null;
+        const ids = bl.map((m) => { db.iuran = db.iuran.filter((i) => !(i.anggota_id === aid && i.tahun === tahun && i.bulan === m));
+          const id = 'w' + Date.now() + m; db.iuran.push({ id, anggota_id: aid, tahun, bulan: m, nominal: db.org.nominal_iuran, status: 'menunggu', metode: 'transfer', bukti_url, catatan, tanggal_bayar: null }); return id; });
+        const kode = 'REQ-' + TH + '-' + String(100 + db.pengajuan.length).padStart(4, '0');
+        db.pengajuan.unshift({ id: 'q' + Date.now(), kode, jenis: 'bukti_bayar', pengaju_id: Auth.profil.id, status: 'menunggu', dibuat_pada: new Date().toISOString(), ref_id: ids[0],
+          ringkasan: `Iuran ${bl.map((m) => NM[m - 1]).join(', ')} ${tahun} (transfer)`, data_usulan: { tahun, bulan: bl, nominal: bl.length * db.org.nominal_iuran, iuran_ids: ids, alasan: catatan || undefined }, lampiran_url: bukti_url });
+        return tunda({ ok: true, kode, jumlah_bulan: bl.length }, 500);
+      },
+      async tunggakan() { perlu('ketua', 'bendahara'); return tunda(tunggakanDemo(), 300); },
+      async kirimPengingat(ids) {
+        perlu('bendahara');
+        const rows = tunggakanDemo().filter((r) => ids.includes(r.anggota_id) && r.email);
+        if (!rows.length) throw new Error('Anggota terpilih tidak memiliki email atau tidak menunggak.');
+        db.antrean.menunggu += rows.length;
+        return tunda({ success: true, message: `${rows.length} email masuk antrean (mode demo, tidak benar-benar dikirim). Sisa kuota hari ini: ${100 - db.antrean.terkirim % 100}.`, data: { diantre: rows.length } }, 600);
+      },
+      async statusAntrean() { perlu('bendahara', 'ketua', 'admin_it'); return tunda(Object.assign({ kuota_tersisa: 63 }, db.antrean)); },
+      async prosesAntreanKini() { perlu('bendahara', 'admin_it'); db.antrean.terkirim += db.antrean.menunggu; const n = db.antrean.menunggu; db.antrean.menunggu = 0; return tunda({ terkirim: n }, 700); },
+      async putuskanPengajuan(id, setuju, catatan) {
+        const x = db.pengajuan.find((q) => q.id === id);
+        const r = await putuskanAsli(id, setuju, catatan);
+        if (x && x.jenis === 'bukti_bayar') {
+          ((x.data_usulan || {}).iuran_ids || [x.ref_id]).forEach((iid) => {
+            const i = db.iuran.find((y) => y.id === iid);
+            if (!i || i.status !== 'menunggu') return;
+            Object.assign(i, { status: setuju ? 'lunas' : 'ditolak', catatan, tanggal_bayar: setuju ? new Date().toISOString() : null });
+            if (setuju) tambahKasIuran(i);
+          });
+        }
+        return r;
+      }
+    });
+  })();
+
+
   function dashDemo(role) {
     const per12 = (f) => Array.from({ length: 12 }, (_, i) => ({ bulan: i + 1, ...f(i) }));
     const bulanIni = new Date().getMonth() + 1;
@@ -472,6 +655,8 @@
         iuran_persen: per12((i) => ({ persen: i < bulanIni ? [92, 95, 88, 90, 97, 93, 79.1, 96.5, 93, 88.4, 76, 0][i] : 0 })),
         lunas_bulan_ini: 76, menunggak: 10, total_tunggakan: 1450000, bukti_menunggu: 5
       };
+      if (db.tunggakanDemo) { const tg = db.tunggakanDemo(); out.keuangan.menunggak = tg.length; out.keuangan.total_tunggakan = tg.reduce((x, r) => x + r.total_tunggakan, 0);
+        out.keuangan.bukti_menunggu = db.iuran.filter((i) => i.status === 'menunggu').length; }
       out.pengajuan_menunggu.bukti_bayar = 5;
     }
     if (role === 'wakil_ketua') out.keuangan_ringkas = { saldo: 14850000, iuran_persen_bulan_ini: 88.4 };

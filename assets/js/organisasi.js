@@ -488,7 +488,7 @@
   const PEMUTUS_LABEL = { perubahan_data: 'Ketua / Sekretaris', usulan_kegiatan: 'Ketua / Wakil Ketua', peserta_lomba: 'Ketua / Sekretaris', prestasi: 'Ketua / Sekretaris', bukti_bayar: 'Bendahara' };
   const jenisBadge = (j) => `<span class="badge ${(JENIS[j] || [])[2] || 'b-slate'}"><i class="bi ${(JENIS[j] || [])[1] || 'bi-dot'}"></i>${(JENIS[j] || [j])[0]}</span>`;
   const LABEL_FIELD = { nama: 'Nama & gelar', nip: 'NIP', sekolah: 'Sekolah induk', judul: 'Judul kegiatan', tanggal: 'Tanggal', lokasi: 'Lokasi', deskripsi: 'Deskripsi',
-    kategori: 'Kategori', nama_siswa: 'Nama siswa', kelas: 'Kelas', lomba: 'Lomba', cabang: 'Cabang', peringkat: 'Peringkat', bulan: 'Bulan', nominal: 'Nominal' };
+    kategori: 'Kategori', nama_siswa: 'Nama siswa', kelas: 'Kelas', lomba: 'Lomba', cabang: 'Cabang', peringkat: 'Peringkat', bulan: 'Bulan', nominal: 'Nominal', tahun: 'Tahun' };
   const nilaiField = (k, v) => k === 'peringkat' ? ((PERINGKAT[v] || {}).label || v) : k === 'bulan' ? [].concat(v).map((b) => BULAN[b - 1]).join(', ')
     : k === 'nominal' ? fmt.rp(v) : k === 'tanggal' ? fmt.tgl(v) : v;
 
@@ -554,7 +554,7 @@
         ${keys.map((k) => { const ubah = d[k] && d[k] !== lama[k];
           return `<tr class="${ubah ? 'changed' : ''}"><td class="muted">${LABEL_FIELD[k]}</td><td class="${ubah ? 'old' : ''}">${esc(lama[k] || '—')}</td><td class="new">${ubah ? esc(d[k]) + ' <span class="badge b-amber" style="margin-left:6px">Berubah</span>' : '<span class="muted">tidak berubah</span>'}</td></tr>`; }).join('')}</tbody></table>`;
     } else {
-      const ent = Object.entries(d).filter(([k]) => k !== 'alasan');
+      const ent = Object.entries(d).filter(([k, v]) => !['alasan', 'iuran_ids'].includes(k) && v !== null && v !== undefined);
       rincian = ent.length ? `<dl class="kv">${ent.map(([k, v]) => `<dt>${esc(LABEL_FIELD[k] || k)}</dt><dd>${esc(nilaiField(k, v))}</dd>`).join('')}</dl>` : '<p class="muted">Tidak ada rincian.</p>';
     }
     const riwayat = [{ keputusan: 'diajukan', catatan: 'Pengajuan dikirim oleh ' + (u.nama || 'pengaju'), waktu: p.dibuat_pada }].concat(p.riwayat || []);

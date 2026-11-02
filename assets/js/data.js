@@ -326,6 +326,32 @@
     },
     hapusDokumen: (id) => q(sb.from('dokumen').delete().eq('id', id)),
 
+    // ---------- BATCH 4: keuangan ----------
+    ringkasanKeuangan: (tahun) => q(sb.rpc('ringkasan_keuangan', { p_tahun: tahun || null })),
+    kasDaftar: (tahun) => q(sb.from('kas_transaksi').select('*').gte('tanggal', tahun + '-01-01').lte('tanggal', tahun + '-12-31')
+      .order('tanggal', { ascending: true }).order('dibuat_pada', { ascending: true }).limit(5000)),
+    async simpanKas(row) {
+      const d = { tanggal: row.tanggal, jenis: row.jenis, kategori: row.kategori || 'Lainnya', uraian: row.uraian, nominal: Number(row.nominal), bukti_url: row.bukti_url || null };
+      const r = row.id ? await q(sb.from('kas_transaksi').update(d).eq('id', row.id).select().single()) : await q(sb.from('kas_transaksi').insert(d).select().single());
+      Data.clearDashCache(); return r;
+    },
+    hapusKas: (id) => q(sb.from('kas_transaksi').delete().eq('id', id)).then((r) => { Data.clearDashCache(); return r; }),
+    async iuranRekap(tahun) {
+      const [anggota, iuran] = await Promise.all([
+        q(sb.from('anggota').select('id,nama,sekolah,no_hp,email,foto_url,tanggal_gabung').eq('status_aktif', true).order('nama').limit(2000)),
+        q(sb.from('iuran').select('*').eq('tahun', tahun).limit(20000))]);
+      return { anggota, iuran };
+    },
+    tandaiLunas: (anggotaId, tahun, bulan) => q(sb.rpc('tandai_lunas', { p_anggota_id: anggotaId, p_tahun: tahun, p_bulan: bulan, p_metode: 'tunai' })).then((r) => { Data.clearDashCache(); return r; }),
+    batalkanLunas: (iuranId) => q(sb.rpc('batalkan_lunas', { p_iuran_id: iuranId })).then((r) => { Data.clearDashCache(); return r; }),
+    iuranSaya: (tahun) => q(sb.from('iuran').select('*').eq('anggota_id', Auth.profil.anggota_id).eq('tahun', tahun)),
+    ajukanBuktiIuran: (tahun, bulan, bukti_url, catatan) => q(sb.rpc('ajukan_bukti_iuran', { p_tahun: tahun, p_bulan: bulan, p_bukti_url: bukti_url, p_catatan: catatan || null }))
+      .then((r) => { Data.clearDashCache(); return r; }),
+    tunggakan: () => q(sb.from('v_tunggakan_iuran').select('*').order('jumlah_bulan', { ascending: false }).order('nama')),
+    kirimPengingat: (ids) => GAS.post('kirimPengingat', { anggota_ids: ids }),
+    statusAntrean: () => GAS.post('statusAntrean', {}).then((r) => r.data),
+    prosesAntreanKini: () => GAS.post('prosesAntreanKini', {}).then((r) => r.data),
+
     // Berkas privat lewat GAS
     async bukaBerkas(url) {
       if (!url) throw new Error('Berkas tidak ada.');
