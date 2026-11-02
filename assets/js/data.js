@@ -142,7 +142,7 @@
       .eq('tampil_publik', true).gte('tanggal', new Date().toISOString().slice(0, 10)).order('tanggal').limit(n)),
     beritaTerbaru: (n = 3) => q(sb.from('berita').select('id,judul,slug,kategori,ringkasan,gambar_url,tanggal_terbit')
       .eq('status', 'terbit').order('tanggal_terbit', { ascending: false }).limit(n)),
-    prestasiTerbaru: (n = 4) => q(sb.from('v_prestasi_publik').select('*').order('tahun', { ascending: false }).limit(n)),
+    prestasiTerbaru: (n = 4) => q(sb.from('v_prestasi_publik').select('*').order('tahun', { ascending: false }).order('dibuat_pada', { ascending: false }).limit(n)),
     prestasiSemua: () => q(sb.from('v_prestasi_publik').select('peringkat,sekolah,tahun')),
     lombaAktif: (n = 3) => q(sb.from('lomba').select('*').neq('status', 'selesai').order('tanggal').limit(n)),
     pengurusPublik: () => q(sb.from('v_pengurus_publik').select('*').order('urutan')),
@@ -351,6 +351,73 @@
     kirimPengingat: (ids) => GAS.post('kirimPengingat', { anggota_ids: ids }),
     statusAntrean: () => GAS.post('statusAntrean', {}).then((r) => r.data),
     prosesAntreanKini: () => GAS.post('prosesAntreanKini', {}).then((r) => r.data),
+
+    // ---------- BATCH 5: halaman publik ----------
+    anggotaPublik: () => q(sb.from('v_anggota_publik').select('*').order('nama').limit(1000)),
+    programPublik: (tahun) => q(sb.from('program_kerja').select('id,kode,judul,deskripsi,penanggung_jawab,target,tanggal_mulai,tanggal_selesai,progres_persen,status,tahun').eq('tahun', tahun).order('kode')),
+    agendaPublik: (tahun) => q(sb.rpc('daftar_kegiatan', { p_tahun: tahun || null })),
+    lombaSemua: () => q(sb.from('lomba').select('*').order('tanggal', { ascending: false }).limit(500)),
+    prestasiPublik: () => q(sb.from('v_prestasi_publik').select('*').order('tahun', { ascending: false }).limit(3000)),
+    beritaPublik: () => q(sb.from('berita').select('id,judul,slug,kategori,ringkasan,gambar_url,tanggal_terbit').eq('status', 'terbit').order('tanggal_terbit', { ascending: false }).limit(300)),
+    async beritaDetail(kunci) {
+      const kol = /^[0-9a-f-]{36}$/i.test(kunci) ? 'id' : 'slug';
+      const r = await q(sb.from('berita').select('*').eq(kol, kunci).maybeSingle());
+      if (!r) throw new Error('Berita tidak ditemukan atau belum diterbitkan.');
+      return r;
+    },
+    albumPublik: () => q(sb.from('dokumentasi_album').select('*, kegiatan(judul), dokumentasi_foto(count)').order('tanggal', { ascending: false }).limit(300)),
+    async albumDetail(id) {
+      const [album, foto] = await Promise.all([q(sb.from('dokumentasi_album').select('*, kegiatan(judul)').eq('id', id).maybeSingle()),
+        q(sb.from('dokumentasi_foto').select('*').eq('album_id', id).order('dibuat_pada'))]);
+      if (!album) throw new Error('Album tidak ditemukan.');
+      return Object.assign(album, { foto });
+    },
+
+    // ---------- BATCH 5: lomba, peserta, prestasi ----------
+    lombaDaftar: () => q(sb.from('lomba').select('*, lomba_peserta(count)').order('tanggal', { ascending: false }).limit(500)),
+    simpanLomba(row) {
+      const d = { nama: row.nama, jenis: row.jenis, cabang: row.cabang || null, tingkat: row.tingkat || null, tanggal: row.tanggal || null, tanggal_selesai: row.tanggal_selesai || null,
+        batas_daftar: row.batas_daftar || null, lokasi: row.lokasi || null, deskripsi: row.deskripsi || null, status: row.status || 'pendaftaran_dibuka' };
+      return row.id ? q(sb.from('lomba').update(d).eq('id', row.id)) : q(sb.from('lomba').insert(d).select().single());
+    },
+    hapusLomba: (id) => q(sb.from('lomba').delete().eq('id', id)),
+    pesertaDaftar: () => q(sb.from('lomba_peserta').select('*, lomba(id,nama,jenis,cabang,tingkat,tanggal,status), anggota(nama), prestasi(id,peringkat,status,sertifikat_url,tampil_publik)')
+      .order('dibuat_pada', { ascending: false }).limit(3000)),
+    simpanPeserta(row) {
+      const d = { lomba_id: row.lomba_id, nama_siswa: row.nama_siswa, kelas: row.kelas || null, sekolah: row.sekolah, cabang: row.cabang || null, guru_pendamping_id: row.guru_pendamping_id || null };
+      return row.id ? q(sb.from('lomba_peserta').update(d).eq('id', row.id)) : q(sb.from('lomba_peserta').insert(Object.assign(d, { status: 'disetujui' })));
+    },
+    hapusPeserta: (id) => q(sb.from('lomba_peserta').delete().eq('id', id)),
+    daftarkanPeserta: (lombaId, siswa) => q(sb.rpc('daftarkan_peserta', { p_lomba: lombaId, p_siswa: siswa })).then((r) => { Data.clearDashCache(); return r; }),
+    async catatHasil(pesertaId, peringkat, sertifikat_url) {
+      const ada = await q(sb.from('prestasi').select('id,sertifikat_url').eq('peserta_id', pesertaId).neq('status', 'ditolak').maybeSingle());
+      const r = ada ? await q(sb.from('prestasi').update({ peringkat, status: 'disetujui', sertifikat_url: sertifikat_url || ada.sertifikat_url }).eq('id', ada.id))
+        : await q(sb.from('prestasi').insert({ peserta_id: pesertaId, peringkat, sertifikat_url: sertifikat_url || null, status: 'disetujui', tampil_publik: true }));
+      Data.clearDashCache(); return r;
+    },
+    prestasiDaftar: () => q(sb.from('prestasi').select('*, lomba_peserta(id,nama_siswa,kelas,sekolah,cabang,guru_pendamping_id, lomba(id,nama,jenis,tingkat,tanggal), anggota(nama))')
+      .order('dibuat_pada', { ascending: false }).limit(3000)),
+    setPrestasiPublik: (id, v) => q(sb.from('prestasi').update({ tampil_publik: v }).eq('id', id)),
+    hapusPrestasi: (id) => q(sb.from('prestasi').delete().eq('id', id)).then((r) => { Data.clearDashCache(); return r; }),
+    ajukanPrestasi: (d) => q(sb.rpc('ajukan_prestasi', { p_peringkat: d.peringkat, p_sertifikat: d.sertifikat_url, p_peserta: d.peserta_id || null,
+      p_lomba: d.lomba_id || null, p_nama_siswa: d.nama_siswa || null, p_kelas: d.kelas || null, p_cabang: d.cabang || null })).then((r) => { Data.clearDashCache(); return r; }),
+
+    // ---------- BATCH 5: berita & dokumentasi ----------
+    beritaDaftar: () => q(sb.from('berita').select('*').order('dibuat_pada', { ascending: false }).limit(500)),
+    simpanBerita(row) {
+      const d = { judul: row.judul, kategori: row.kategori, ringkasan: row.ringkasan || null, isi: row.isi || null, gambar_url: row.gambar_url || null, status: row.status };
+      return row.id ? q(sb.from('berita').update(d).eq('id', row.id).select().single()) : q(sb.from('berita').insert(d).select().single());
+    },
+    hapusBerita: (id) => q(sb.from('berita').delete().eq('id', id)),
+    albumDaftar: () => q(sb.from('dokumentasi_album').select('*, kegiatan(judul), dokumentasi_foto(count)').order('tanggal', { ascending: false }).limit(500)),
+    simpanAlbum(row) {
+      const d = { judul: row.judul, kegiatan_id: row.kegiatan_id || null, tanggal: row.tanggal, kategori: row.kategori || null, sampul_url: row.sampul_url || null };
+      return row.id ? q(sb.from('dokumentasi_album').update(d).eq('id', row.id).select().single()) : q(sb.from('dokumentasi_album').insert(d).select().single());
+    },
+    hapusAlbum: (id) => q(sb.from('dokumentasi_album').delete().eq('id', id)),
+    tambahFoto: (albumId, foto_url, keterangan) => q(sb.from('dokumentasi_foto').insert({ album_id: albumId, foto_url, keterangan: keterangan || null }).select().single()),
+    ubahFoto: (id, keterangan) => q(sb.from('dokumentasi_foto').update({ keterangan: keterangan || null }).eq('id', id)),
+    hapusFoto: (id) => q(sb.from('dokumentasi_foto').delete().eq('id', id)),
 
     // Berkas privat lewat GAS
     async bukaBerkas(url) {

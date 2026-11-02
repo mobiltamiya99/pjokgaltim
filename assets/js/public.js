@@ -177,10 +177,10 @@
 
     Data.beritaTerbaru(3).then((rows) => {
       const ikon = { Kurikulum: 'bi-journal-text', Prestasi: 'bi-trophy', Organisasi: 'bi-people' };
-      $('#berita').innerHTML = rows.length ? rows.map((b) => `<article class="card card-hover news-card">
+      $('#berita').innerHTML = rows.length ? rows.map((b) => `<a class="card card-hover news-card" href="#/berita/${esc(b.slug || b.id)}">
           <div class="news-cover">${b.gambar_url ? `<img src="${esc(b.gambar_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<i class="bi ${ikon[b.kategori] || 'bi-newspaper'}"></i>`}</div>
           <div class="body"><div class="meta"><span class="badge b-navy">${esc(b.kategori || 'Berita')}</span><span><i class="bi bi-calendar3"></i>${fmt.tglPendek(b.tanggal_terbit)}</span></div>
-          <h4>${esc(b.judul)}</h4><p>${esc(b.ringkasan || '')}</p><span class="more">BACA SELENGKAPNYA →</span></div></article>`).join('')
+          <h4>${esc(b.judul)}</h4><p>${esc(b.ringkasan || '')}</p><span class="more">BACA SELENGKAPNYA →</span></div></a>`).join('')
         : `<div class="card" style="grid-column:1/-1">${emptyState('Belum ada berita', 'Berita yang sudah terbit akan tampil di sini.', 'bi-newspaper')}</div>`;
     }).catch(gagal('#berita'));
 
@@ -215,13 +215,13 @@
 
     Data.lombaAktif(3).then((rows) => {
       const warna = { O2SN: 'b-navy', POPDA: 'b-teal', 'Pekan Seni': 'b-amber' };
-      $('#lomba').innerHTML = rows.length ? rows.map((l) => `<article class="card card-hover">
+      $('#lomba').innerHTML = rows.length ? rows.map((l) => `<a class="card card-hover" href="#/lomba" style="color:inherit;text-decoration:none">
           <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="badge ${warna[l.jenis] || 'b-slate'}">${esc(l.jenis)} ${new Date(l.tanggal || Date.now()).getFullYear()}</span>
           <span class="badge b-teal"><span class="dot pulse"></span>Pendaftaran Dibuka</span></div>
           <h4 style="font-size:18px;font-weight:700;margin:12px 0 6px">${esc(l.nama)}</h4>
           <div class="meta"><span><i class="bi bi-flag"></i>${esc(l.cabang || '-')}</span><span><i class="bi bi-geo-alt"></i>${esc(l.lokasi || '-')}</span></div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-            <span class="body-sm muted">Batas daftar</span><b style="color:var(--amber-hover)">${fmt.tglPendek(l.batas_daftar || l.tanggal)}</b></div></article>`).join('')
+            <span class="body-sm muted">Batas daftar</span><b style="color:var(--amber-hover)">${fmt.tglPendek(l.batas_daftar || l.tanggal)}</b></div></a>`).join('')
         : `<div class="card" style="grid-column:1/-1">${emptyState('Belum ada lomba dibuka', 'Jadwal seleksi akan diumumkan di sini.', 'bi-flag')}</div>`;
     }).catch(gagal('#lomba'));
   }
@@ -422,5 +422,5 @@
     $$('#demoRoles [data-role]').forEach((b) => b.onclick = () => { Auth.masukDemo(b.dataset.role); Router.go('/app/dashboard'); });
   }
 
-  window.PublicPages = { beranda, profil, kontak, daftar, masuk, segera };
+  window.PublicPages = { beranda, profil, kontak, daftar, masuk, segera, _shell: shell, _gagal: gagal };
 })();

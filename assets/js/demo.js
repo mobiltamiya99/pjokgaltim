@@ -636,6 +636,207 @@
   })();
 
 
+  // =================================================================
+  // BATCH 5 — data contoh lomba, peserta, prestasi, berita, dokumentasi
+  // =================================================================
+  (function () {
+    const LBL = { juara_1: 'Juara 1', juara_2: 'Juara 2', juara_3: 'Juara 3', harapan_1: 'Harapan 1', harapan_2: 'Harapan 2', harapan_3: 'Harapan 3' };
+    const foto = (judul, warna, ikon) => 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="560"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${warna}"/><stop offset="1" stop-color="#173D72"/></linearGradient></defs><rect width="800" height="560" fill="url(#g)"/><circle cx="640" cy="120" r="140" fill="rgba(255,255,255,.08)"/><circle cx="120" cy="470" r="90" fill="rgba(255,255,255,.06)"/><text x="400" y="270" text-anchor="middle" font-family="Arial" font-size="64">${ikon}</text><text x="400" y="350" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="30" fill="#fff">${judul}</text><text x="400" y="390" text-anchor="middle" font-family="Arial" font-size="18" fill="rgba(255,255,255,.75)">Foto contoh (mode demo)</text></svg>`);
+    const lombaBaru = [
+      ['l1', 'O2SN Tingkat Kecamatan Tegal Timur', 'O2SN', 'Atletik, Renang, Pencak Silat', 'Kecamatan', hari(20), hari(21), hari(12), 'Stadion Yos Sudarso', 'pendaftaran_dibuka'],
+      ['l2', 'Kejuaraan Bola Voli Mini Putri', 'POPDA', 'Bola Voli Mini', 'Kota', hari(48), hari(49), hari(35), 'GOR Wisanggeni', 'pendaftaran_dibuka'],
+      ['l3', 'Festival Egrang & Gobak Sodor', 'Pekan Seni', 'Olahraga Tradisional', 'Kecamatan', hari(70), null, hari(55), 'Alun-alun Tegal', 'pendaftaran_dibuka'],
+      ['l4', 'O2SN Kota Tegal', 'O2SN', 'Atletik, Bulutangkis, Renang', 'Kota', `${th}-05-14`, `${th}-05-16`, `${th}-04-30`, 'Stadion Yos Sudarso', 'selesai'],
+      ['l5', 'POPDA Kota Tegal', 'POPDA', 'Pencak Silat, Bulutangkis, Atletik', 'Kota', `${th}-07-22`, `${th}-07-25`, `${th}-07-05`, 'GOR Wisanggeni', 'selesai'],
+      ['l6', 'Pekan Seni & Olahraga Pelajar', 'Pekan Seni', 'Senam, Tari Kreasi', 'Kota', `${th}-09-10`, `${th}-09-11`, `${th}-08-25`, 'Taman Poci', 'selesai'],
+      ['l7', 'O2SN Kota Tegal', 'O2SN', 'Atletik, Renang', 'Kota', `${th - 1}-05-20`, `${th - 1}-05-22`, `${th - 1}-05-05`, 'Stadion Yos Sudarso', 'selesai']
+    ].map(([id, nama, jenis, cabang, tingkat, tanggal, tanggal_selesai, batas_daftar, lokasi, status], i) => ({ id, kode: `LMB-${String(tanggal).slice(0, 4)}-${String(i + 1).padStart(2, '0')}`, nama, jenis, cabang, tingkat, tanggal, tanggal_selesai, batas_daftar, lokasi, status,
+      deskripsi: 'Seleksi resmi untuk siswa SD binaan. Pendaftaran kontingen dilakukan guru pendamping melalui portal anggota.', dibuat_pada: tanggal + 'T08:00:00Z' }));
+    db.lomba = lombaBaru;
+    const SISWA = ['Ahmad Fauzan R.', 'Siti Nurhaliza', 'Bima Arya Pratama', 'Nadia Putri', 'Rafi Akbar', 'Citra Lestari', 'Dimas Saputra', 'Aulia Rahma', 'Fajar Nugroho', 'Kirana Ayu',
+      'Galih Prakoso', 'Salsabila', 'Yoga Pratama', 'Intan Permata', 'Raka Mahendra', 'Zahra Amelia', 'Bagas Setiawan', 'Nabila Putri', 'Rizal Firmansyah', 'Tiara Anjani',
+      'Hafiz Ramadhan', 'Keisha Aurel', 'Daffa Alvaro', 'Nayla Zahira', 'Arka Wijaya', 'Shafa Kamila', 'Tim Senam Pramuka', 'Tim Voli Mini Putri'];
+    const CAB = { l4: ['Lari 60 m Putra', 'Lari 60 m Putri', 'Lompat Jauh', 'Renang Gaya Bebas 50 m', 'Bulutangkis Tunggal Putri'], l5: ['Pencak Silat Tanding', 'Pencak Silat Tunggal', 'Bulutangkis Tunggal Putra', 'Tolak Peluru'],
+      l6: ['Senam Kesegaran Jasmani', 'Tari Kreasi'], l7: ['Lari 60 m Putra', 'Renang Gaya Dada 50 m'], l1: ['Lari 60 m Putra', 'Renang Gaya Bebas 50 m'], l2: ['Bola Voli Mini'] };
+    const guru = db.anggota.filter((a) => a.status_aktif).slice(0, 14);
+    db.lp = [];
+    db.prest = [];
+    const PK = ['juara_1', 'juara_2', 'juara_3', 'juara_1', 'harapan_1', 'juara_2', 'juara_3', 'harapan_2', 'juara_1', 'juara_3', 'harapan_3', 'juara_2'];
+    let n = 0;
+    ['l4', 'l5', 'l6', 'l7'].forEach((lid) => {
+      for (let i = 0; i < (lid === 'l7' ? 4 : 9); i++, n++) {
+        const g = guru[(n * 3) % guru.length];
+        const pid = 'ps' + n;
+        db.lp.push({ id: pid, lomba_id: lid, nama_siswa: SISWA[n % SISWA.length], kelas: String(4 + (n % 3)), sekolah: g.sekolah, cabang: CAB[lid][i % CAB[lid].length], guru_pendamping_id: g.id, status: 'disetujui', dibuat_pada: hari(-200 + n) });
+        if (i < (lid === 'l7' ? 3 : 7)) db.prest.push({ id: 'pr' + n, peserta_id: pid, peringkat: PK[n % PK.length], sertifikat_url: svgDoc('Piagam ' + LBL[PK[n % PK.length]]), status: 'disetujui', tampil_publik: n % 11 !== 5, diajukan_oleh: null, dibuat_pada: new Date(Date.now() - (120 - n) * 864e5).toISOString() });
+      }
+    });
+    // Peserta lomba yang sedang dibuka (sebagian milik Agus a5 = akun demo Anggota)
+    [['l1', 'a5', 'Rafi Akbar', '5', 'Lari 60 m Putra', 'disetujui'], ['l1', 'a2', 'Kirana Ayu', '6', 'Renang Gaya Bebas 50 m', 'disetujui'], ['l2', 'a3', 'Tim Voli Mini Putri', '5–6', 'Bola Voli Mini', 'disetujui']]
+      .forEach(([lid, aid, nm, kelas, cabang, status], i) => db.lp.push({ id: 'pb' + i, lomba_id: lid, nama_siswa: nm, kelas, sekolah: agtById(aid).sekolah, cabang, guru_pendamping_id: aid, status, dibuat_pada: hari(-3 + i) }));
+    // Hubungkan pengajuan contoh q3 (peserta) & q4 (prestasi) ke data nyata
+    const q3 = db.pengajuan.find((q) => q.id === 'q3');
+    if (q3) {
+      const ids = [['Dimas Saputra', '6'], ['Aulia Rahma', '5'], ['Salsabila', '5']].map(([nm, kelas], i) => { const id = 'pq' + i;
+        db.lp.push({ id, lomba_id: 'l1', nama_siswa: nm, kelas, sekolah: agtById('a5').sekolah, cabang: i ? 'Lompat Jauh' : 'Lari 60 m Putra', guru_pendamping_id: 'a5', status: 'menunggu', dibuat_pada: hari(-1) }); return id; });
+      Object.assign(q3, { ref_id: ids[0], ringkasan: '3 siswa — O2SN Tingkat Kecamatan Tegal Timur',
+        data_usulan: { lomba: 'O2SN Tingkat Kecamatan Tegal Timur', cabang: 'Atletik', nama_siswa: 'Dimas Saputra, Aulia Rahma, Salsabila', kelas: '5, 6', sekolah: agtById('a5').sekolah, peserta_ids: ids } });
+    }
+    const q4 = db.pengajuan.find((q) => q.id === 'q4');
+    if (q4) {
+      db.lp.push({ id: 'pn', lomba_id: 'l5', nama_siswa: 'Nadia Putri', kelas: '5', sekolah: agtById('a6').sekolah, cabang: 'Pencak Silat Tunggal Putri', guru_pendamping_id: 'a6', status: 'menunggu', dibuat_pada: hari(-2) });
+      db.prest.push({ id: 'prn', peserta_id: 'pn', peringkat: 'juara_1', sertifikat_url: q4.lampiran_url, status: 'menunggu', tampil_publik: true, diajukan_oleh: 'a6', dibuat_pada: hari(-2) });
+      Object.assign(q4, { ref_id: 'prn', ringkasan: 'Juara 1 — Nadia Putri (POPDA Kota Tegal)', data_usulan: { nama_siswa: 'Nadia Putri', kelas: '5', lomba: 'POPDA Kota Tegal', cabang: 'Pencak Silat Tunggal Putri', peringkat: 'juara_1' } });
+    }
+
+    const pesertaLengkap = (p) => Object.assign({}, p, { lomba: db.lomba.find((l) => l.id === p.lomba_id) || null, anggota: p.guru_pendamping_id ? { nama: (agtById(p.guru_pendamping_id) || {}).nama } : null,
+      prestasi: db.prest.filter((x) => x.peserta_id === p.id).map((x) => ({ id: x.id, peringkat: x.peringkat, status: x.status, sertifikat_url: x.sertifikat_url, tampil_publik: x.tampil_publik })) });
+    const vPublik = () => db.prest.filter((x) => x.status === 'disetujui' && x.tampil_publik).map((x) => {
+      const p = db.lp.find((y) => y.id === x.peserta_id) || {}; const l = db.lomba.find((y) => y.id === p.lomba_id) || {};
+      return { id: x.id, peringkat: x.peringkat, nama_siswa: p.nama_siswa, kelas: p.kelas, sekolah: p.sekolah, cabang: p.cabang || l.cabang, lomba: l.nama, jenis_lomba: l.jenis, tingkat: l.tingkat,
+        tahun: Number(String(l.tanggal || x.dibuat_pada).slice(0, 4)), guru_pendamping: (agtById(p.guru_pendamping_id) || {}).nama, lomba_id: l.id, tanggal_lomba: l.tanggal, dibuat_pada: x.dibuat_pada };
+    }).sort((a, b) => b.tahun - a.tahun || String(b.dibuat_pada).localeCompare(String(a.dibuat_pada)));
+    const bolehLihatPeserta = (p) => ['ketua', 'wakil_ketua', 'sekretaris', 'bendahara'].includes(Auth.profil.role) || p.guru_pendamping_id === Auth.profil.anggota_id;
+
+    // Berita lengkap (isi, slug, draf)
+    const ISI = (j) => `${j}.\n\nKegiatan ini diikuti guru PJOK dari seluruh gugus di Kecamatan Tegal Timur. Dalam sambutannya, Ketua KKG menekankan pentingnya kolaborasi antarsekolah agar pembelajaran PJOK semakin bermakna bagi siswa.\n\nPeserta mengikuti sesi materi, praktik lapangan, dan diskusi kelompok. Hasil kegiatan akan ditindaklanjuti melalui pendampingan di masing-masing sekolah.\n\n"Kami berharap praktik baik ini dapat diterapkan di kelas mulai minggu depan," ujar salah satu narasumber.`;
+    const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 70);
+    db.berita = db.berita.map((b, i) => Object.assign(b, { slug: slug(b.judul), status: 'terbit', isi: ISI(b.ringkasan), gambar_url: foto(b.kategori, ['#16B8B0', '#F59E0B', '#2F5D9E'][i % 3], ['📊', '🏆', '🤝'][i % 3]), dibuat_pada: b.tanggal_terbit }))
+      .concat([
+        { id: 'b4', judul: 'Sosialisasi Juknis O2SN Tingkat Kecamatan Tahun ' + th, kategori: 'Pengumuman', ringkasan: 'Guru pendamping diminta mendaftarkan kontingen sekolah melalui portal anggota paling lambat sesuai jadwal.', tanggal_terbit: hari(-2), status: 'terbit', gambar_url: foto('Pengumuman', '#F59E0B', '📢') },
+        { id: 'b5', judul: 'Workshop Kurikulum Merdeka: Modul Ajar PJOK Fase A–C', kategori: 'Kurikulum', ringkasan: 'Sebanyak 48 guru menyusun modul ajar berdiferensiasi dan bank soal asesmen formatif.', tanggal_terbit: hari(-40), status: 'terbit', gambar_url: foto('Workshop', '#16B8B0', '📚') },
+        { id: 'b6', judul: 'Rencana Family Gathering & Senam Akbar Akhir Tahun', kategori: 'Organisasi', ringkasan: 'Draf rencana kegiatan kebersamaan anggota beserta keluarga.', tanggal_terbit: null, status: 'draf', gambar_url: null }
+      ].map((b) => Object.assign(b, { slug: slug(b.judul), isi: ISI(b.ringkasan), dibuat_pada: b.tanggal_terbit || hari(-1) })));
+    // Dokumentasi
+    db.album = [['al1', 'Workshop Kurikulum Merdeka PJOK', 'k4', hari(-40), 'Workshop', '#16B8B0', '📚', 6], ['al2', 'O2SN Kota Tegal ' + th, null, `${th}-05-15`, 'Lomba', '#F59E0B', '🏃', 8],
+      ['al3', 'Rakor Rutin Bulanan Gugus', 'k5', hari(-70), 'Koordinasi', '#2F5D9E', '🤝', 4], ['al4', 'Pelantikan Pengurus 2025–2028', null, `${th - 1}-08-12`, 'Organisasi', '#0E8C86', '🎖️', 5]]
+      .map(([id, judul, kegiatan_id, tanggal, kategori, w, ik, nfoto]) => ({ id, judul, kegiatan_id, tanggal, kategori, dibuat_pada: tanggal,
+        foto: Array.from({ length: nfoto }, (_, i) => ({ id: id + 'f' + i, album_id: id, foto_url: foto(judul.slice(0, 26) + ' #' + (i + 1), w, ik), keterangan: i === 0 ? 'Pembukaan acara' : i === 1 ? 'Sesi materi' : null, dibuat_pada: tanggal })) }));
+    db.album.forEach((a) => { a.sampul_url = a.foto[0].foto_url; });
+    const albumOut = (a) => Object.assign({}, a, { foto: undefined, kegiatan: a.kegiatan_id ? { judul: (db.kegiatan.find((k) => k.id === a.kegiatan_id) || {}).judul } : null, dokumentasi_foto: [{ count: a.foto.length }] });
+    const putuskanSebelum = Data.putuskanPengajuan;
+
+    Object.assign(Data, {
+      statPublik: () => tunda({ anggota_aktif: db.anggota.filter((a) => a.status_aktif).length, sekolah: new Set(db.anggota.filter((a) => a.status_aktif).map((a) => a.sekolah)).size,
+        program_kerja: db.program.filter((p) => p.tahun === th).length, prestasi: db.prest.filter((x) => x.status === 'disetujui').length }),
+      beritaTerbaru: (k = 3) => tunda(db.berita.filter((b) => b.status === 'terbit').sort((a, b) => String(b.tanggal_terbit).localeCompare(String(a.tanggal_terbit))).slice(0, k)),
+      prestasiTerbaru: (k = 4) => tunda(vPublik().slice(0, k)),
+      prestasiSemua: () => tunda(vPublik()),
+      lombaAktif: (k = 3) => tunda(db.lomba.filter((l) => l.status !== 'selesai').sort((a, b) => String(a.tanggal).localeCompare(String(b.tanggal))).slice(0, k)),
+      anggotaPublik: () => tunda(db.anggota.filter((a) => a.tampil_publik && a.status_aktif).sort((a, b) => a.nama.localeCompare(b.nama))
+        .map((a) => ({ id: a.id, nama: a.nama, sekolah: a.sekolah, foto_url: a.foto_url, kompetensi: a.kompetensi, status_kepegawaian: a.status_kepegawaian, nip_samaran: a.nip ? a.nip.slice(0, 8) + '•'.repeat(a.nip.length - 8) : null }))),
+      programPublik: (t) => tunda(db.program.filter((p) => p.tahun === Number(t)).sort((a, b) => String(a.kode).localeCompare(String(b.kode)))),
+      agendaPublik: (t) => Data.kegiatanDaftar(t).then((r) => r.filter((k) => k.tampil_publik !== false)),
+      lombaSemua: () => tunda(db.lomba.slice().sort((a, b) => String(b.tanggal).localeCompare(String(a.tanggal)))),
+      prestasiPublik: () => tunda(vPublik(), 300),
+      beritaPublik: () => Data.beritaTerbaru(300),
+      async beritaDetail(k) { const b = db.berita.find((x) => (x.slug === k || x.id === k) && (x.status === 'terbit' || (Auth.profil && ['ketua', 'wakil_ketua', 'sekretaris'].includes(Auth.profil.role)))); if (!b) throw new Error('Berita tidak ditemukan atau belum diterbitkan.'); return tunda(b); },
+      albumPublik: () => tunda(db.album.slice().sort((a, b) => String(b.tanggal).localeCompare(String(a.tanggal))).map(albumOut)),
+      async albumDetail(id) { const a = db.album.find((x) => x.id === id); if (!a) throw new Error('Album tidak ditemukan.'); return tunda(Object.assign(albumOut(a), { foto: a.foto })); },
+
+      lombaDaftar: () => tunda(db.lomba.slice().sort((a, b) => String(b.tanggal).localeCompare(String(a.tanggal)))
+        .map((l) => Object.assign({}, l, { lomba_peserta: [{ count: db.lp.filter((p) => p.lomba_id === l.id && bolehLihatPeserta(p)).length }] }))),
+      async simpanLomba(row) {
+        perlu('sekretaris');
+        if (row.tanggal_selesai && row.tanggal && row.tanggal_selesai < row.tanggal) throw new Error('Tanggal selesai tidak boleh sebelum tanggal mulai.');
+        if (row.batas_daftar && row.tanggal && row.batas_daftar > row.tanggal) throw new Error('Batas pendaftaran tidak boleh setelah tanggal lomba.');
+        if (row.id) { Object.assign(db.lomba.find((l) => l.id === row.id), row); return tunda(null); }
+        const t = String(row.tanggal || hari(0)).slice(0, 4);
+        const baru = Object.assign({}, row, { id: 'l' + Date.now(), kode: `LMB-${t}-${String(db.lomba.filter((l) => String(l.kode).includes(t)).length + 1).padStart(2, '0')}`, dibuat_pada: new Date().toISOString() });
+        db.lomba.push(baru); return tunda(baru);
+      },
+      async hapusLomba(id) { perlu('sekretaris'); db.lomba = db.lomba.filter((l) => l.id !== id); const ids = db.lp.filter((p) => p.lomba_id === id).map((p) => p.id); db.lp = db.lp.filter((p) => p.lomba_id !== id); db.prest = db.prest.filter((x) => !ids.includes(x.peserta_id)); return tunda(null); },
+      pesertaDaftar: () => tunda(db.lp.filter(bolehLihatPeserta).sort((a, b) => String(b.dibuat_pada).localeCompare(String(a.dibuat_pada))).map(pesertaLengkap), 300),
+      async simpanPeserta(row) {
+        perlu('sekretaris');
+        if (row.id) { Object.assign(db.lp.find((p) => p.id === row.id), row); return tunda(null); }
+        db.lp.push(Object.assign({}, row, { id: 'p' + Date.now(), status: 'disetujui', dibuat_pada: new Date().toISOString() })); return tunda(null);
+      },
+      async hapusPeserta(id) {
+        const p = db.lp.find((x) => x.id === id);
+        if (!(Auth.profil.role === 'sekretaris' || (p && p.guru_pendamping_id === Auth.profil.anggota_id && p.status === 'menunggu'))) throw new Error('Anda tidak memiliki izin untuk tindakan ini.');
+        db.lp = db.lp.filter((x) => x.id !== id); db.prest = db.prest.filter((x) => x.peserta_id !== id); return tunda(null);
+      },
+      async daftarkanPeserta(lombaId, siswa) {
+        const aid = Auth.profil.anggota_id; if (!aid) throw new Error('Akun Anda belum ditautkan ke data anggota.');
+        const l = db.lomba.find((x) => x.id === lombaId); if (!l) throw new Error('Lomba tidak ditemukan.');
+        if (l.status === 'selesai') throw new Error('Lomba sudah selesai.');
+        if (l.batas_daftar && l.batas_daftar < hari(0)) throw new Error('Pendaftaran lomba ini sudah ditutup.');
+        if (!siswa.length) throw new Error('Isi minimal satu siswa.');
+        const sek = agtById(aid).sekolah;
+        siswa.forEach((s) => { if (String(s.nama_siswa || '').trim().length < 3) throw new Error('Nama siswa wajib diisi (min. 3 huruf).');
+          if (db.lp.some((p) => p.lomba_id === lombaId && p.sekolah === sek && p.status !== 'ditolak' && p.nama_siswa.toLowerCase() === s.nama_siswa.trim().toLowerCase())) throw new Error(`Siswa "${s.nama_siswa.trim()}" sudah terdaftar di lomba ini.`); });
+        const ids = siswa.map((s, i) => { const id = 'pd' + Date.now() + i; db.lp.push({ id, lomba_id: lombaId, nama_siswa: s.nama_siswa.trim(), kelas: s.kelas || null, sekolah: sek, cabang: s.cabang || l.cabang, guru_pendamping_id: aid, status: 'menunggu', dibuat_pada: new Date().toISOString() }); return id; });
+        const kode = 'REQ-' + th + '-' + String(100 + db.pengajuan.length).padStart(4, '0');
+        db.pengajuan.unshift({ id: 'q' + Date.now(), kode, jenis: 'peserta_lomba', pengaju_id: Auth.profil.id, status: 'menunggu', dibuat_pada: new Date().toISOString(), ref_id: ids[0], ringkasan: `${ids.length} siswa — ${l.nama}`,
+          data_usulan: { lomba: l.nama, cabang: l.cabang, nama_siswa: siswa.map((s) => s.nama_siswa.trim()).join(', '), kelas: [...new Set(siswa.map((s) => s.kelas).filter(Boolean))].join(', '), sekolah: sek, peserta_ids: ids } });
+        return tunda({ ok: true, kode, jumlah: ids.length }, 500);
+      },
+      async catatHasil(pesertaId, peringkat, sertifikat_url) {
+        perlu('sekretaris');
+        const ada = db.prest.find((x) => x.peserta_id === pesertaId && x.status !== 'ditolak');
+        if (ada) Object.assign(ada, { peringkat, status: 'disetujui', sertifikat_url: sertifikat_url || ada.sertifikat_url });
+        else db.prest.push({ id: 'pr' + Date.now(), peserta_id: pesertaId, peringkat, sertifikat_url: sertifikat_url || null, status: 'disetujui', tampil_publik: true, diajukan_oleh: null, dibuat_pada: new Date().toISOString() });
+        return tunda(null);
+      },
+      prestasiDaftar: () => tunda(db.prest.filter((x) => { const p = db.lp.find((y) => y.id === x.peserta_id) || {}; return bolehLihatPeserta(p) || x.diajukan_oleh === Auth.profil.anggota_id; })
+        .map((x) => { const p = db.lp.find((y) => y.id === x.peserta_id) || {}; return Object.assign({}, x, { lomba_peserta: Object.assign({}, p, { lomba: db.lomba.find((l) => l.id === p.lomba_id) || null, anggota: p.guru_pendamping_id ? { nama: (agtById(p.guru_pendamping_id) || {}).nama } : null }) }); })
+        .sort((a, b) => String(b.dibuat_pada).localeCompare(String(a.dibuat_pada))), 300),
+      async setPrestasiPublik(id, v) { perlu('sekretaris'); db.prest.find((x) => x.id === id).tampil_publik = v; return tunda(null, 200); },
+      async hapusPrestasi(id) { perlu('sekretaris'); db.prest = db.prest.filter((x) => x.id !== id); return tunda(null); },
+      async ajukanPrestasi(d) {
+        const aid = Auth.profil.anggota_id; if (!aid) throw new Error('Akun Anda belum ditautkan ke data anggota.');
+        if (!d.sertifikat_url) throw new Error('Unggah sertifikat / piagam sebagai bukti.');
+        let p;
+        if (d.peserta_id) { p = db.lp.find((x) => x.id === d.peserta_id); if (!p || p.guru_pendamping_id !== aid) throw new Error('Peserta tidak ditemukan atau bukan siswa binaan Anda.'); }
+        else {
+          const l = db.lomba.find((x) => x.id === d.lomba_id); if (!l) throw new Error('Pilih lomba terlebih dahulu.');
+          if (String(d.nama_siswa || '').trim().length < 3) throw new Error('Nama siswa wajib diisi.');
+          p = { id: 'pa' + Date.now(), lomba_id: l.id, nama_siswa: d.nama_siswa.trim(), kelas: d.kelas || null, sekolah: agtById(aid).sekolah, cabang: d.cabang || l.cabang, guru_pendamping_id: aid, status: 'menunggu', dibuat_pada: new Date().toISOString() };
+          db.lp.push(p);
+        }
+        if (db.prest.some((x) => x.peserta_id === p.id && x.status !== 'ditolak')) throw new Error('Prestasi untuk siswa ini sudah tercatat atau sedang diverifikasi.');
+        const pr = { id: 'pr' + Date.now(), peserta_id: p.id, peringkat: d.peringkat, sertifikat_url: d.sertifikat_url, status: 'menunggu', tampil_publik: true, diajukan_oleh: aid, dibuat_pada: new Date().toISOString() };
+        db.prest.push(pr);
+        const l = db.lomba.find((x) => x.id === p.lomba_id) || {};
+        const kode = 'REQ-' + th + '-' + String(100 + db.pengajuan.length).padStart(4, '0');
+        db.pengajuan.unshift({ id: 'q' + Date.now(), kode, jenis: 'prestasi', pengaju_id: Auth.profil.id, status: 'menunggu', dibuat_pada: new Date().toISOString(), ref_id: pr.id, lampiran_url: d.sertifikat_url,
+          ringkasan: `${LBL[d.peringkat]} — ${p.nama_siswa} (${l.nama})`, data_usulan: { nama_siswa: p.nama_siswa, kelas: p.kelas, lomba: l.nama, cabang: p.cabang, peringkat: d.peringkat } });
+        return tunda({ ok: true, kode }, 500);
+      },
+      async putuskanPengajuan(id, setuju, catatan) {
+        const x = db.pengajuan.find((q) => q.id === id);
+        const r = await putuskanSebelum(id, setuju, catatan);
+        if (x && x.jenis === 'peserta_lomba') ((x.data_usulan || {}).peserta_ids || [x.ref_id]).forEach((pid) => { const p = db.lp.find((y) => y.id === pid); if (p) p.status = setuju ? 'disetujui' : 'ditolak'; });
+        if (x && x.jenis === 'prestasi') { const pr = db.prest.find((y) => y.id === x.ref_id); if (pr) { pr.status = setuju ? 'disetujui' : 'ditolak'; const p = db.lp.find((y) => y.id === pr.peserta_id); if (setuju && p && p.status === 'menunggu') p.status = 'disetujui'; } }
+        return r;
+      },
+
+      async beritaDaftar() { perlu('ketua', 'wakil_ketua', 'sekretaris'); return tunda(db.berita.slice().sort((a, b) => String(b.dibuat_pada).localeCompare(String(a.dibuat_pada)))); },
+      async simpanBerita(row) {
+        perlu('wakil_ketua', 'sekretaris');
+        const b = row.id ? db.berita.find((x) => x.id === row.id) : { id: 'bn' + Date.now(), dibuat_pada: new Date().toISOString() };
+        Object.assign(b, row, { tanggal_terbit: row.status === 'terbit' ? (b.tanggal_terbit || new Date().toISOString()) : null });
+        if (!b.slug || b.status === 'draf') { let s = slug(b.judul) || 'berita', n = 1; const dasar = s; while (db.berita.some((x) => x.slug === s && x.id !== b.id)) s = dasar + '-' + (++n); b.slug = s; }
+        if (!row.id) db.berita.unshift(b);
+        return tunda(b);
+      },
+      async hapusBerita(id) { perlu('wakil_ketua', 'sekretaris'); db.berita = db.berita.filter((b) => b.id !== id); return tunda(null); },
+      albumDaftar: () => Data.albumPublik(),
+      async simpanAlbum(row) {
+        perlu('wakil_ketua', 'sekretaris');
+        const bersih = Object.fromEntries(Object.entries(row).filter(([k]) => ['judul', 'kegiatan_id', 'tanggal', 'kategori', 'sampul_url'].includes(k)));
+        if (row.id) { Object.assign(db.album.find((a) => a.id === row.id), bersih); return tunda(null); }
+        const a = Object.assign({}, bersih, { id: 'al' + Date.now(), foto: [], dibuat_pada: new Date().toISOString() }); db.album.unshift(a); return tunda(albumOut(a));
+      },
+      async hapusAlbum(id) { perlu('wakil_ketua', 'sekretaris'); db.album = db.album.filter((a) => a.id !== id); return tunda(null); },
+      async tambahFoto(albumId, foto_url, keterangan) { perlu('wakil_ketua', 'sekretaris'); const a = db.album.find((x) => x.id === albumId); const f = { id: 'f' + Date.now() + Math.random().toString(36).slice(2, 5), album_id: albumId, foto_url, keterangan: keterangan || null, dibuat_pada: new Date().toISOString() }; a.foto.push(f); if (!a.sampul_url) a.sampul_url = foto_url; return tunda(f, 150); },
+      async ubahFoto(id, ket) { perlu('wakil_ketua', 'sekretaris'); db.album.forEach((a) => a.foto.forEach((f) => { if (f.id === id) f.keterangan = ket || null; })); return tunda(null, 150); },
+      async hapusFoto(id) { perlu('wakil_ketua', 'sekretaris'); db.album.forEach((a) => { a.foto = a.foto.filter((f) => f.id !== id); }); return tunda(null, 150); }
+    });
+  })();
+
+
   function dashDemo(role) {
     const per12 = (f) => Array.from({ length: 12 }, (_, i) => ({ bulan: i + 1, ...f(i) }));
     const bulanIni = new Date().getMonth() + 1;
@@ -669,7 +870,7 @@
       out.program = [['Modul Ajar PJOK Terpadu', 85, 'berjalan'], ['Seleksi Kontingen O2SN', 60, 'berjalan'], ['Digitalisasi Bank Soal PJOK', 40, 'berjalan'], ['Rakor Kerja Awal Tahun', 100, 'selesai'], ['Family Gathering & Senam Akbar', 25, 'berjalan']].map(([judul, progres, status]) => ({ judul, progres, status }));
     }
     if (['ketua', 'wakil_ketua', 'sekretaris', 'anggota'].includes(role)) {
-      out.medali = db.medali;
+      out.medali = db.lp ? Object.fromEntries(['juara_1','juara_2','juara_3','harapan_1','harapan_2','harapan_3'].map((p) => [p, db.prest.filter((x) => x.status === 'disetujui' && x.peringkat === p).length])) : db.medali;
       out.top_sekolah = db.topSekolah.map(([sekolah, poin]) => ({ sekolah, poin, medali: Math.round(poin / 4) }));
     }
     if (role === 'ketua') out.pengajuan_menunggu = { pendaftaran_anggota: 2, perubahan_data: 1, peserta_lomba: 3, prestasi: 1, usulan_kegiatan: 1 };

@@ -620,7 +620,9 @@
   Router.add('/daftar', P.daftar);
   Router.add('/masuk', P.masuk);
   [['anggota', 'Data Anggota'], ['program', 'Program Kerja'], ['agenda', 'Agenda Kegiatan'], ['lomba', 'Jadwal Lomba'], ['prestasi', 'Prestasi Siswa'], ['berita', 'Berita & Pengumuman'], ['dokumentasi', 'Dokumentasi']]
-    .forEach(([k, j]) => Router.add('/' + k, () => P.segera(k, j)));
+    .forEach(([k, j]) => Router.add('/' + k, () => (P[k] ? P[k]() : P.segera(k, j))));
+  Router.add(/^\/berita\/([\w-]+)$/, (m) => P.beritaDetail(m));
+  Router.add(/^\/dokumentasi\/([\w-]+)$/, (m) => P.albumPublik(m));
 
   // Registri halaman: modul batch lain menambah lewat window.AppPages
   const HAL = window.AppPages = Object.assign(window.AppPages || {}, { dashboard, pengaturan, akun, notifikasi });
