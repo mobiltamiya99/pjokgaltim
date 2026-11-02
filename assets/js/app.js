@@ -275,33 +275,34 @@
     const kpi = (cls, ic, lbl, val, unit, sub) => `<div class="kpi ${cls}"><span class="ic"><i class="bi ${ic}"></i></span><div class="lbl">${lbl}</div>
       <div class="val">${val}${unit ? `<small>${unit}</small>` : ''}</div><div class="sub">${sub}</div></div>`;
     const iuranPersen = k ? (k.iuran_persen[bulanIni] || {}).persen || 0 : 0;
+    // Kartu KPI dibuat hanya untuk peran yang sedang masuk (data peran lain tidak tersedia)
     const set = {
-      ketua: [
+      ketua: () => [
         kpi('navy', 'bi-people-fill', 'Total Anggota Aktif', fmt.num(agt.aktif), 'guru', `+${agt.baru_bulan_ini} bulan ini · ${agt.nonaktif} nonaktif`),
         kpi('teal', 'bi-bank', 'Saldo Kas KKG', fmt.rpSingkat(k.saldo), '', `Masuk ${fmt.rpSingkat(k.masuk_bulan_ini)} · Keluar ${fmt.rpSingkat(k.keluar_bulan_ini)}`),
         kpi('amber', 'bi-graph-up-arrow', 'Kepatuhan Iuran', fmt.num(iuranPersen), '%', `Lunas ${k.lunas_bulan_ini} · Menunggak ${k.menunggak}`),
         kpi('deep', 'bi-hourglass-split', 'Persetujuan Pending', totalPm, 'berkas', 'Menunggu keputusan Anda')],
-      bendahara: [
+      bendahara: () => [
         kpi('teal', 'bi-bank', 'Saldo Kas', fmt.rpSingkat(k.saldo), '', 'Seluruh periode'),
         kpi('navy', 'bi-arrow-down-circle', 'Pemasukan Bulan Ini', fmt.rpSingkat(k.masuk_bulan_ini), '', 'Iuran & sumbangan'),
         kpi('deep', 'bi-arrow-up-circle', 'Pengeluaran Bulan Ini', fmt.rpSingkat(k.keluar_bulan_ini), '', 'Operasional & kegiatan'),
         kpi('amber', 'bi-exclamation-diamond', 'Anggota Menunggak', fmt.num(k.menunggak), 'guru', `Total ${fmt.rp(k.total_tunggakan)}`)],
-      wakil_ketua: [
+      wakil_ketua: () => [
         kpi('navy', 'bi-people-fill', 'Anggota Aktif', fmt.num(agt.aktif), 'guru', `+${agt.baru_bulan_ini} bulan ini`),
         kpi('teal', 'bi-clipboard-data', 'Program Berjalan', (d.program || []).filter((x) => x.status !== 'selesai').length, 'program', `${(d.program || []).length} program tahun ini`),
         kpi('deep', 'bi-calendar2-check', 'Kegiatan Tahun Ini', (d.kegiatan || []).length, 'kegiatan', 'Termasuk yang sudah selesai'),
         kpi('amber', 'bi-wallet2', 'Ringkasan Saldo', d.keuangan_ringkas ? fmt.rpSingkat(d.keuangan_ringkas.saldo) : '-', '', `Iuran bulan ini ${d.keuangan_ringkas ? d.keuangan_ringkas.iuran_persen_bulan_ini : 0}%`)],
-      sekretaris: [
+      sekretaris: () => [
         kpi('navy', 'bi-people-fill', 'Anggota Aktif', fmt.num(agt.aktif), 'guru', `${agt.negeri} SD Negeri · ${agt.swasta} Swasta`),
         kpi('amber', 'bi-person-plus', 'Pendaftar Menunggu', fmt.num(pm.pendaftaran_anggota || 0), 'orang', 'Perlu verifikasi'),
         kpi('deep', 'bi-check2-square', 'Pengajuan Pending', totalPm - (pm.pendaftaran_anggota || 0), 'berkas', 'Data, lomba, prestasi'),
         kpi('teal', 'bi-trophy-fill', 'Prestasi Tahun Ini', medTotal, 'medali', `${(d.medali || {}).juara_1 || 0} emas`)],
-      admin_it: [
+      admin_it: () => [
         kpi('navy', 'bi-people-fill', 'Anggota Aktif', fmt.num(agt.aktif), 'guru', `${agt.nonaktif} nonaktif`),
         kpi('amber', 'bi-person-check', 'Menunggu Aktivasi', fmt.num(pm.aktivasi_akun || 0), 'akun', 'Sudah disetujui pengurus'),
         kpi('teal', 'bi-person-plus', 'Anggota Baru', fmt.num(agt.baru_bulan_ini), 'bulan ini', 'Bergabung bulan berjalan'),
         kpi('deep', 'bi-activity', 'Aktivitas Terbaru', (d.aktivitas || []).length, 'catatan', 'Lihat linimasa di bawah')],
-      anggota: (() => {
+      anggota: () => (() => {
         const is = d.iuran_saya || { lunas: [], menunggu: [] };
         const sampai = is.lunas.length ? BLN[Math.max(...is.lunas) - 1] : '—';
         const tunggak = Math.max(0, bulanIni + 1 - is.lunas.length - is.menunggu.length);
@@ -312,7 +313,7 @@
           kpi('teal', 'bi-trophy-fill', 'Medali KKG Tahun Ini', medTotal, 'medali', 'Seluruh kontingen Tegal Timur')];
       })()
     };
-    $('#kpi').innerHTML = (set[role] || []).join('');
+    $('#kpi').innerHTML = (set[role] ? set[role]() : []).join('');
 
     // ---- Kartu grafik (hanya yang tersedia untuk peran ini) ----
     const kartu = [];
