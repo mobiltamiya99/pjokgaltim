@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="id" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>KKG PJOK Tegal Timur — Website Organisasi & Sistem Administrasi</title>
+  <meta name="description" content="Website resmi dan sistem administrasi digital Kelompok Kerja Guru PJOK Kecamatan Tegal Timur, Kota Tegal: agenda, prestasi siswa, berita, dan layanan anggota.">
+  <meta name="theme-color" content="#173D72">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23173D72'/%3E%3Cpath d='M20 14h24v10a12 12 0 0 1-24 0zM14 18h6v6a6 6 0 0 1-6-6zM44 18h6a6 6 0 0 1-6 6zM28 36h8v8h6v6H22v-6h6z' fill='%2316B8B0'/%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="assets/css/app.css">
+
+  <!-- Terapkan tema sebelum render agar tidak berkedip -->
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('kkg_theme'); } catch (e) {}
+      if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <div id="loader" aria-hidden="true"><div class="spinner"></div></div>
+  <div id="root"></div>
+  <div id="toasts" aria-live="polite"></div>
+
+  <noscript><p style="padding:24px;font-family:sans-serif">Aplikasi ini memerlukan JavaScript. Silakan aktifkan JavaScript di peramban Anda.</p></noscript>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/core.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/demo.js"></script>
+  <script src="assets/js/public.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
