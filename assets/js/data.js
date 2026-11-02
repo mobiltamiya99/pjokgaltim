@@ -419,6 +419,25 @@
     ubahFoto: (id, keterangan) => q(sb.from('dokumentasi_foto').update({ keterangan: keterangan || null }).eq('id', id)),
     hapusFoto: (id) => q(sb.from('dokumentasi_foto').delete().eq('id', id)),
 
+    // ---------- BATCH 6: pusat laporan & log ----------
+    laporanArsip: () => q(sb.from('laporan_arsip').select('*').order('dibuat_pada', { ascending: false }).limit(300)),
+    simpanLaporanPdf: (d) => GAS.post('simpanLaporan', d).then((r) => r.data),
+    catatEkspor: (jenis, judul, periode, format = 'xlsx') => q(sb.rpc('catat_ekspor', { p_jenis: jenis, p_judul: judul, p_periode: periode, p_format: format })).catch(() => null),
+    rekapKehadiran: (mulai, selesai) => q(sb.rpc('rekap_kehadiran', { p_mulai: mulai, p_selesai: selesai })),
+    async logAktivitas({ dari = '', sampai = '', aksi = '', tabel = '', cari = '', halaman = 1, per = 20, semua = false } = {}) {
+      let x = sb.from('log_aktivitas').select('*', { count: 'exact' });
+      if (dari) x = x.gte('waktu', dari + 'T00:00:00+07:00');
+      if (sampai) x = x.lte('waktu', sampai + 'T23:59:59+07:00');
+      if (aksi) x = x.eq('aksi', aksi);
+      if (tabel) x = x.eq('tabel', tabel);
+      cari = String(cari).replace(/[,()*%]/g, ' ').trim();
+      if (cari) x = x.ilike('nama_aktor', '%' + cari + '%');
+      x = x.order('waktu', { ascending: false });
+      x = semua ? x.limit(5000) : x.range((halaman - 1) * per, halaman * per - 1);
+      const r = await q(x);
+      return { rows: r.data, total: r.count };
+    },
+
     // Berkas privat lewat GAS
     async bukaBerkas(url) {
       if (!url) throw new Error('Berkas tidak ada.');

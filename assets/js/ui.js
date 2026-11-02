@@ -24,7 +24,9 @@
   //   muat(state) → { rows, total }
   // ------------------------------------------------------------------
   function tabel(opt) {
-    const st = Object.assign({ halaman: 1, per: 10, urut: null, naik: true }, opt.state || {});
+    // Pakai objek state milik halaman (bukan salinan) agar filter yang diubah halaman ikut terbaca
+    const st = opt.state || {};
+    Object.entries({ halaman: 1, per: 10, urut: null, naik: true }).forEach(([k, v]) => { if (st[k] === undefined) st[k] = v; });
     const pilihan = new Set();
     let rows = [];
     const id = 'tb' + Math.random().toString(36).slice(2, 7);
@@ -141,7 +143,7 @@
     try {
       const r = await window.KKG.Data.bukaBerkas(url);
       const src = r.dataUrl || r.url;
-      const pdf = (r.mime || '').includes('pdf') || /\.pdf($|\?)/i.test(src) || /\/file\/d\//.test(src);
+      const pdf = (r.mime || '').includes('pdf') || /\.pdf($|\?)/i.test(src) || /\/file\/d\//.test(src) || /^data:text\/html/.test(src);
       const body = $('.modal-body', m.el);
       body.innerHTML = pdf
         ? `<iframe src="${esc(src.replace('/view', '/preview'))}" title="Pratinjau PDF" style="width:100%;height:70vh;border:0;border-radius:12px;background:var(--surface-2)"></iframe>`
@@ -194,49 +196,67 @@
   // ------------------------------------------------------------------
   // Cetak / Simpan PDF dengan kop organisasi (via dialog cetak browser)
   // ------------------------------------------------------------------
-  async function cetakDokumen({ judul, sub = '', body, ttd = [], landscape = false, meta = '' }) {
+  // Susun HTML dokumen berkop. Tata letak memakai tabel agar sama rapinya
+  // saat dicetak browser maupun saat diubah ke PDF oleh Google Apps Script.
+  async function htmlDokumen({ judul, sub = '', body, ttd = [], landscape = false, meta = '', ringkasan = [] }) {
     const org = await window.KKG.Data.org();
     const now = new Date();
-    const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>${esc(judul)}</title>
+    const jam = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    const logo = org.logo_url ? `<img src="${esc(org.logo_url)}" alt="" style="width:64px;height:64px;object-fit:contain">`
+      : '<div style="width:64px;height:64px;background:#173D72;color:#fff;border-radius:10px;text-align:center;line-height:64px;font-weight:800;font-size:20px">KKG</div>';
+    return `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>${esc(judul)}</title>
       <style>
         @page { size: A4 ${landscape ? 'landscape' : 'portrait'}; margin: 16mm 14mm 18mm; @bottom-right { content: "Halaman " counter(page) " dari " counter(pages); font: 9pt Arial; color: #555; } }
-        body { font: 10pt Arial, sans-serif; color: #111; margin: 0; }
-        .kop { display: flex; gap: 14px; align-items: center; border-bottom: 3px double #173D72; padding-bottom: 10px; }
-        .kop img, .kop .lg { width: 64px; height: 64px; object-fit: contain; }
-        .kop .lg { background: #173D72; color: #fff; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 20px; }
+        body { font: 10pt Arial, Helvetica, sans-serif; color: #111; margin: 0; }
+        table { width: 100%; border-collapse: collapse; }
+        .kop td { border: 0; padding: 0 0 8px; vertical-align: middle; }
         .kop h1 { margin: 0; font-size: 15pt; color: #173D72; letter-spacing: .02em; }
         .kop p { margin: 2px 0 0; font-size: 9pt; color: #333; }
-        h2 { text-align: center; font-size: 13pt; margin: 16px 0 2px; text-transform: uppercase; }
+        .garis { border-top: 3px double #173D72; height: 0; margin: 0 0 4px; }
+        h2 { text-align: center; font-size: 13pt; margin: 14px 0 2px; text-transform: uppercase; }
         .sub { text-align: center; font-size: 9.5pt; color: #444; margin-bottom: 12px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #173D72; color: #fff; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .03em; padding: 6px; border: 1px solid #173D72; text-align: left; }
-        td { border: 1px solid #C9D3E0; padding: 5px 6px; font-size: 9pt; vertical-align: top; }
+        .data th { background: #173D72; color: #fff; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .03em; padding: 6px; border: 1px solid #173D72; text-align: left; }
+        .data td { border: 1px solid #C9D3E0; padding: 5px 6px; font-size: 9pt; vertical-align: top; }
+        .data td.num, .data th.num { text-align: right; white-space: nowrap; }
+        .data tr.total td { font-weight: bold; background: #EEF2F7; }
         tr { page-break-inside: avoid; } thead { display: table-header-group; }
+        .rk { margin-bottom: 12px; } .rk td { border: 1px solid #C9D3E0; padding: 6px 8px; font-size: 9pt; width: 25%; }
+        .rk b { display: block; font-size: 12pt; color: #173D72; }
         .kv td { border: 0; padding: 3px 6px; } .kv td:first-child { width: 150px; color: #444; }
         .isi { line-height: 1.6; font-size: 10.5pt; white-space: pre-wrap; margin-top: 12px; }
-        .meta { display: flex; justify-content: space-between; font-size: 8.5pt; color: #555; margin-top: 8px; }
-        .ttd { display: flex; justify-content: space-around; margin-top: 36px; page-break-inside: avoid; }
-        .ttd div { text-align: center; min-width: 200px; } .ttd .nm { margin-top: 64px; font-weight: bold; text-decoration: underline; }
+        .meta td { border: 0; font-size: 8.5pt; color: #555; padding-top: 8px; }
+        .ttd { margin-top: 30px; page-break-inside: avoid; } .ttd td { border: 0; text-align: center; vertical-align: top; font-size: 10pt; }
+        .ttd .nm { padding-top: 64px; font-weight: bold; text-decoration: underline; }
       </style></head><body>
-      <div class="kop">${org.logo_url ? `<img src="${esc(org.logo_url)}" alt="">` : '<div class="lg">KKG</div>'}
-        <div><h1>${esc((org.nama || '').toUpperCase())}</h1><p>${esc(org.instansi_pembina || '')}</p><p>${esc(org.alamat || '')} · ${esc(org.email || '')}</p></div></div>
+      <table class="kop"><tr><td style="width:76px">${logo}</td>
+        <td><h1>${esc((org.nama || '').toUpperCase())}</h1><p>${esc(org.instansi_pembina || '')}</p><p>${esc(org.alamat || '')}${org.email ? ' · ' + esc(org.email) : ''}${org.telepon ? ' · ' + esc(org.telepon) : ''}</p></td></tr></table>
+      <div class="garis"></div>
       <h2>${esc(judul)}</h2><div class="sub">${esc(sub)}</div>
+      ${ringkasan.length ? `<table class="rk"><tr>${ringkasan.map(([k, v]) => `<td>${esc(k)}<b>${esc(v)}</b></td>`).join('')}</tr></table>` : ''}
       ${body}
-      <div class="meta"><span>${meta}</span><span>Dicetak: ${fmt.tgl(now)} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}</span></div>
-      ${ttd.length ? `<div class="ttd">${ttd.map((t) => `<div>${esc(t.jabatan)}<div class="nm">${esc(t.nama || '(....................................)')}</div>${t.nip ? `<div>NIP. ${esc(t.nip)}</div>` : ''}</div>`).join('')}</div>` : ''}
+      <table class="meta"><tr><td>${meta}</td><td style="text-align:right">Dicetak: ${fmt.tgl(now)} ${jam} WIB</td></tr></table>
+      ${ttd.length ? `<table class="ttd"><tr>${ttd.map((t) => `<td>${t.kota ? esc(t.kota) + '<br>' : ''}${esc(t.jabatan)}<div class="nm">${esc(t.nama || '(....................................)')}</div>${t.nip ? `<div>NIP. ${esc(t.nip)}</div>` : ''}</td>`).join('')}</tr></table>` : ''}
       </body></html>`;
+  }
+  // Cetak via dialog browser (Simpan sebagai PDF / printer)
+  async function cetakDokumen(opt) { cetakHtml(await htmlDokumen(opt)); }
+  function cetakHtml(html) {
     const fr = document.createElement('iframe');
     fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
     document.body.appendChild(fr);
     fr.contentDocument.open(); fr.contentDocument.write(html); fr.contentDocument.close();
     setTimeout(() => { fr.contentWindow.focus(); fr.contentWindow.print(); setTimeout(() => fr.remove(), 2000); }, 400);
   }
+  // Badan tabel data laporan (dipakai cetak & Pusat Laporan)
+  function tabelData(kolom, rows, total) {
+    return `<table class="data"><thead><tr><th style="width:28px">No</th>${kolom.map((k) => `<th class="${k.num ? 'num' : ''}"${k.lebar ? ` style="width:${k.lebar}"` : ''}>${esc(k.label)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map((r, i) => `<tr><td>${i + 1}</td>${kolom.map((k) => `<td class="${k.num ? 'num' : ''}">${esc(k.val ? k.val(r) : r[k.key] ?? '')}</td>`).join('')}</tr>`).join('')}
+      ${total ? `<tr class="total"><td></td>${kolom.map((k) => `<td class="${k.num ? 'num' : ''}">${esc(total[k.label] ?? '')}</td>`).join('')}</tr>` : ''}</tbody></table>`;
+  }
 
   // Cetak tabel data (laporan daftar)
   function cetak({ judul, sub = '', kolom, rows, ttd = [] }) {
-    const body = `<table><thead><tr><th style="width:28px">No</th>${kolom.map((k) => `<th${k.lebar ? ` style="width:${k.lebar}"` : ''}>${esc(k.label)}</th>`).join('')}</tr></thead>
-      <tbody>${rows.map((r, i) => `<tr><td>${i + 1}</td>${kolom.map((k) => `<td>${esc(k.val ? k.val(r) : r[k.key] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-    return cetakDokumen({ judul, sub, body, ttd, landscape: kolom.length > 6, meta: 'Jumlah data: ' + rows.length });
+    return cetakDokumen({ judul, sub, body: tabelData(kolom, rows), ttd, landscape: kolom.length > 6, meta: 'Jumlah data: ' + rows.length });
   }
 
   // Cetak dokumen naratif (notulen, berita acara): pasangan info + isi teks
@@ -262,8 +282,11 @@
     const agt = await window.KKG.Data.anggotaPilihan().catch(() => []);
     const cari = (id) => agt.find((a) => a.id === id) || {};
     const L = { ketua: ['Ketua', org.ketua_id], sekretaris: ['Sekretaris', org.sekretaris_id], bendahara: ['Bendahara', org.bendahara_id] };
-    return jabatan.map((j) => { const a = cari(L[j][1]); return { jabatan: L[j][0] + ' ' + (org.singkatan || ''), nama: a.nama, nip: a.nip }; });
+    const out = jabatan.map((j) => { const a = cari(L[j][1]); return { jabatan: L[j][0] + ' ' + (org.singkatan || ''), nama: a.nama, nip: a.nip }; });
+    if (out.length > 1) out[0].kota = 'Mengetahui,';
+    if (out.length) out[out.length - 1].kota = 'Tegal, ' + fmt.tgl(new Date());
+    return out;
   }
 
-  window.UI = { tabel, saringLokal, drawer, lihatBerkas, eksporCSV, bacaCSV, cetak, cetakIsi, cetakDokumen, siapkanBerkas, penandatangan, badgeStatus };
+  window.UI = { tabel, saringLokal, drawer, lihatBerkas, eksporCSV, bacaCSV, cetak, cetakIsi, cetakDokumen, htmlDokumen, cetakHtml, tabelData, siapkanBerkas, penandatangan, badgeStatus };
 })();

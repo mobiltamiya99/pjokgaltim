@@ -837,6 +837,71 @@
   })();
 
 
+  // =================================================================
+  // BATCH 6 — data contoh log aktivitas & arsip laporan
+  // =================================================================
+  (function () {
+    const AKTOR = [['u2', 'Budi Santoso, S.Pd.Jas'], ['u3', 'Hendra Setiawan, S.Pd'], ['u4', 'Siti Rahmawati, S.Pd'], ['u5', 'Dedi Kurniawan, M.Pd'], ['u1', 'Fajar Prasetyo'], ['u6', 'Agus Priyono, S.Pd']];
+    const POLA = [
+      [4, 'INSERT', 'anggota', null, { nama: 'Rahmat Hidayat, S.Pd', sekolah: 'SD Negeri Kejambon 2', status_kepegawaian: 'PNS' }],
+      [4, 'UPDATE', 'anggota', { no_hp: '081230000000', tampil_publik: false }, { no_hp: '081234567890', tampil_publik: true }],
+      [3, 'INSERT', 'iuran', null, { bulan: 10, tahun: th, status: 'lunas', metode: 'tunai', nominal: 20000 }],
+      [3, 'INSERT', 'kas_transaksi', null, { jenis: 'keluar', kategori: 'Konsumsi', uraian: 'Konsumsi rapat pengurus', nominal: 150000 }],
+      [3, 'APPROVE', 'pengajuan', null, { catatan: 'Transfer sesuai mutasi rekening' }],
+      [1, 'UPDATE', 'kegiatan', { tanggal: hari(14), lokasi: 'SD Negeri Slerok 2' }, { tanggal: hari(17), lokasi: 'GOR Wisanggeni Tegal' }],
+      [1, 'INSERT', 'program_kerja', null, { judul: 'Digitalisasi Bank Soal PJOK', tahun: th }],
+      [2, 'INSERT', 'surat_masuk', null, { nomor_surat: '421/1084/Disdikbud/' + th, perihal: 'Undangan Rakor O2SN' }],
+      [2, 'INSERT', 'berita', null, { judul: 'Sosialisasi Juknis O2SN', status: 'terbit' }],
+      [2, 'REJECT', 'pengajuan', null, { catatan: 'Mohon lampirkan SK CPNS sebagai bukti NIP yang benar.' }],
+      [0, 'UPDATE', 'pengaturan_organisasi', { nominal_iuran: 15000 }, { nominal_iuran: 20000 }],
+      [0, 'UPDATE', 'pengguna', { role: 'anggota' }, { role: 'bendahara' }],
+      [4, 'UPDATE', 'pengguna', { status_aktif: true }, { status_aktif: false }],
+      [0, 'APPROVE', 'pengajuan', null, { catatan: 'Data lengkap, disetujui.' }],
+      [5, 'INSERT', 'kegiatan_peserta', null, { kegiatan: 'Workshop Asesmen Kebugaran Jasmani' }],
+      [2, 'DELETE', 'dokumen', { judul: 'Draf LPJ lama', kategori: 'LPJ' }, null],
+      [3, 'EXPORT', 'laporan', null, { judul: 'Buku Kas Umum', periode: 'Oktober ' + th, format: 'pdf' }]
+    ];
+    db.log = Array.from({ length: 140 }, (_, i) => {
+      const [ai, aksi, tabel, lama, baru] = POLA[(i * 7) % POLA.length];
+      const [pid, nama] = AKTOR[ai];
+      return { id: 1000 - i, pengguna_id: pid, nama_aktor: nama, aksi, tabel, ref_id: aksi === 'EXPORT' ? 'kas' : 'x' + (5000 + i).toString(16), data_lama: lama, data_baru: baru,
+        waktu: new Date(Date.now() - (i * 9.5 + (i % 5)) * 36e5).toISOString() };
+    });
+    db.arsip = [
+      { id: 'ar1', jenis: 'kas', judul: 'Buku Kas Umum', periode: 'Oktober ' + th, format: 'pdf', file_url: svgDoc('Buku Kas Umum'), ukuran_kb: 182, dibuat_oleh: 'u5', dibuat_pada: hari(-2) + 'T09:12:00Z' },
+      { id: 'ar2', jenis: 'anggota', judul: 'Laporan Data Anggota', periode: 'Per ' + hari(-9), format: 'pdf', file_url: svgDoc('Data Anggota'), ukuran_kb: 96, dibuat_oleh: 'u4', dibuat_pada: hari(-9) + 'T13:40:00Z' },
+      { id: 'ar3', jenis: 'prestasi', judul: 'Rekap Prestasi Siswa', periode: 'Semester 1 ' + th, format: 'pdf', file_url: svgDoc('Rekap Prestasi'), ukuran_kb: 120, dibuat_oleh: 'u2', dibuat_pada: hari(-30) + 'T08:05:00Z' }
+    ];
+    const PERAN = { anggota: ['ketua', 'wakil_ketua', 'sekretaris', 'admin_it'], pengurus: ['ketua', 'wakil_ketua', 'sekretaris', 'bendahara'], program: ['ketua', 'wakil_ketua', 'sekretaris'],
+      kegiatan: ['ketua', 'wakil_ketua', 'sekretaris'], kehadiran: ['ketua', 'wakil_ketua', 'sekretaris'], kas: ['ketua', 'bendahara'], iuran: ['ketua', 'bendahara'], tunggakan: ['ketua', 'bendahara'],
+      peserta: ['ketua', 'wakil_ketua', 'sekretaris'], prestasi: ['ketua', 'wakil_ketua', 'sekretaris'], surat: ['ketua', 'sekretaris'], dokumentasi: ['ketua', 'wakil_ketua', 'sekretaris'], akun: ['ketua', 'admin_it'], log: ['ketua', 'admin_it'] };
+    const catat = (jenis, judul, periode, format) => db.log.unshift({ id: Date.now(), pengguna_id: Auth.profil.id, nama_aktor: Auth.profil.nama, aksi: 'EXPORT', tabel: 'laporan', ref_id: jenis, data_lama: null, data_baru: { judul, periode, format }, waktu: new Date().toISOString() });
+    Object.assign(Data, {
+      async laporanArsip() { const p = Auth.profil; return tunda(db.arsip.filter((a) => ['ketua', 'admin_it'].includes(p.role) || a.dibuat_oleh === p.id)); },
+      async simpanLaporanPdf(d) {
+        if (!(PERAN[d.jenis] || []).includes(Auth.profil.role)) throw new Error('Akses ditolak untuk peran ' + Auth.profil.role + '.');
+        const url = 'data:text/html;charset=utf-8,' + encodeURIComponent(d.html);
+        db.arsip.unshift({ id: 'ar' + Date.now(), jenis: d.jenis, judul: d.judul, periode: d.periode, format: 'pdf', file_url: url, ukuran_kb: Math.ceil(d.html.length / 1024), dibuat_oleh: Auth.profil.id, dibuat_pada: new Date().toISOString() });
+        catat(d.jenis, d.judul, d.periode, 'pdf');
+        return tunda({ url, demo: true, nama: d.judul + '.html' }, 700);
+      },
+      async catatEkspor(jenis, judul, periode, format) { catat(jenis, judul, periode, format || 'xlsx'); return tunda({ ok: true }, 50); },
+      async rekapKehadiran(mulai, selesai) {
+        perlu('ketua', 'wakil_ketua', 'sekretaris');
+        return tunda(db.peserta.map((p) => { const k = db.kegiatan.find((x) => x.id === p.kegiatan_id); const a = agtById(p.anggota_id) || {};
+          return k && k.tanggal >= mulai && k.tanggal <= selesai ? { kode: k.kode, judul: k.judul, tanggal: k.tanggal, lokasi: k.lokasi, nama: a.nama, nip: a.nip, sekolah: a.sekolah, hadir: p.hadir, catatan: p.catatan } : null; })
+          .filter(Boolean).sort((x, y) => x.tanggal.localeCompare(y.tanggal) || String(x.nama).localeCompare(String(y.nama))));
+      },
+      async logAktivitas({ dari = '', sampai = '', aksi = '', tabel = '', cari = '', halaman = 1, per = 20, semua = false } = {}) {
+        perlu('ketua', 'admin_it');
+        const r = db.log.filter((l) => (!dari || l.waktu.slice(0, 10) >= dari) && (!sampai || l.waktu.slice(0, 10) <= sampai) && (!aksi || l.aksi === aksi) && (!tabel || l.tabel === tabel)
+          && (!cari || String(l.nama_aktor).toLowerCase().includes(cari.toLowerCase())));
+        return tunda({ rows: semua ? r.slice(0, 5000) : r.slice((halaman - 1) * per, halaman * per), total: r.length }, 250);
+      }
+    });
+  })();
+
+
   function dashDemo(role) {
     const per12 = (f) => Array.from({ length: 12 }, (_, i) => ({ bulan: i + 1, ...f(i) }));
     const bulanIni = new Date().getMonth() + 1;
