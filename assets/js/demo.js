@@ -313,6 +313,146 @@
     }
   });
 
+
+  // =================================================================
+  // BATCH 3 — data contoh program, kegiatan, persuratan & arsip
+  // =================================================================
+  const TH = new Date().getFullYear();
+  db.program = [
+    ['Pelatihan Senam SKJ 2022 & Perwasitan Atletik', 'Hendra Setiawan, S.Pd', '60 Guru PJOK', -200, -120, 100],
+    ['Digitalisasi Modul & Bank Soal PJOK Fase A–C', 'Siti Rahmawati, S.Pd', '100 Modul', -150, 60, 60],
+    ['Pelaksanaan Seleksi O2SN Tingkat Kecamatan', 'Budi Santoso, S.Pd.Jas', '12 SD peserta', -60, 30, 40],
+    ['Workshop Asesmen Kebugaran Jasmani', 'Hendra Setiawan, S.Pd', '42 SD', -20, 90, 15],
+    ['Family Gathering & Senam Akbar Anggota', 'Dedi Kurniawan, M.Pd', '1 kegiatan', 40, 70, 0]
+  ].map(([judul, pj, target, m, s2, pr], i) => ({ id: 'pk' + (i + 1), kode: `PRG-${TH}-${String(i + 1).padStart(2, '0')}`, judul, penanggung_jawab: pj, target,
+    tanggal_mulai: hari(m), tanggal_selesai: hari(s2), progres_persen: pr, status: pr >= 100 ? 'selesai' : pr > 0 ? 'berjalan' : 'belum_mulai', tahun: TH,
+    deskripsi: 'Program kerja KKG PJOK Tegal Timur tahun ' + TH + '.' }));
+  db.kegiatan = db.kegiatan.map((k, i) => Object.assign(k, { kode: `ACT-${TH}-${String(i + 21).padStart(3, '0')}`, program_id: ['pk4', 'pk1', 'pk3'][i], tampil_publik: true, status: 'akan_datang', kuota: 60, deskripsi: 'Kegiatan resmi KKG PJOK Tegal Timur.' }))
+    .concat([
+      { id: 'k4', kode: `ACT-${TH}-018`, judul: 'Workshop Kurikulum Merdeka PJOK Fase B', kategori: 'Workshop', tanggal: hari(-14), jam_mulai: '08:00', jam_selesai: '13:00', lokasi: 'SD Negeri Mintaragen 1', program_id: 'pk2', tampil_publik: true, status: 'akan_datang', kuota: 50 },
+      { id: 'k5', kode: `ACT-${TH}-015`, judul: 'Rakor Rutin Bulanan Gugus', kategori: 'Koordinasi', tanggal: hari(-40), jam_mulai: '13:00', jam_selesai: '15:00', lokasi: 'SD Negeri Kejambon 2', program_id: null, tampil_publik: false, status: 'akan_datang', kuota: null },
+      { id: 'k6', kode: `ACT-${TH}-012`, judul: 'Pelatihan Wasit & Juri O2SN', kategori: 'Pelatihan', tanggal: hari(-75), jam_mulai: '07:30', jam_selesai: '12:00', lokasi: 'GOR Wisanggeni Tegal', program_id: 'pk1', tampil_publik: true, status: 'akan_datang', kuota: 40 },
+      { id: 'k7', kode: `ACT-${TH}-009`, judul: 'Seminar Gizi & Kebugaran Anak', kategori: 'Seminar', tanggal: hari(-20), jam_mulai: '09:00', jam_selesai: '11:00', lokasi: 'Aula Korwil Tegal Timur', program_id: null, tampil_publik: true, status: 'dibatalkan', kuota: 80 }
+    ]);
+  db.peserta = [];
+  ['k4', 'k5', 'k6'].forEach((kid, j) => db.anggota.slice(0, 16 - j * 3).forEach((a, i) => db.peserta.push({ id: 'kp' + kid + i, kegiatan_id: kid, anggota_id: a.id,
+    hadir: (i + j) % 9 === 4 ? 'izin' : (i + j) % 11 === 7 ? 'alpa' : 'hadir', waktu_hadir: hari(-1), catatan: (i + j) % 9 === 4 ? 'Dinas luar' : null })));
+  db.anggota.slice(0, 9).forEach((a, i) => { if (i !== 4) db.peserta.push({ id: 'kpk1' + i, kegiatan_id: 'k1', anggota_id: a.id, hadir: null }); });
+  db.suratMasuk = [
+    ['421.2/1084/Disdikbud/2026', 'Disdikbud Kota Tegal', 'Undangan Rakor Persiapan O2SN SD 2026', -2, 'Disposisi: Ketua'],
+    ['005/KKG-PJOK-TT/II/2026', 'Korwilcam Dikbud Tegal Timur', 'Permohonan izin tempat pelatihan wasit senam', -6, 'Selesai'],
+    ['426/089/KONI-TGL/2026', 'KONI Kota Tegal', 'Sosialisasi tes kebugaran atlet pelajar usia dini', -12, 'Selesai'],
+    ['02/IGORNAS-JTG/X/2026', 'IGORNAS Jawa Tengah', 'Imbauan partisipasi workshop Senam SKJ 2022', -18, 'Menunggu Arahan']
+  ].map(([nomor_surat, pengirim, perihal, d, disposisi], i) => ({ id: 'sm' + (i + 1), nomor_agenda: `AGD-${TH}/${String(42 - i).padStart(3, '0')}`, nomor_surat, tanggal_surat: hari(d - 2), tanggal: hari(d), pengirim, perihal, disposisi,
+    file_url: i % 2 === 0 ? svgDoc('Surat ' + pengirim.split(' ')[0]) : null }));
+  db.suratKeluar = [
+    ['Kepala SD se-Kecamatan Tegal Timur', 'Undangan Workshop Asesmen Kebugaran Jasmani', -3, 'terkirim'],
+    ['Disdikbud Kota Tegal', 'Laporan pelaksanaan Pelatihan Wasit & Juri O2SN', -9, 'terkirim'],
+    ['Ketua Gugus se-Tegal Timur', 'Pemberitahuan jadwal Rakor Bulanan', 0, 'draf']
+  ].map(([tujuan, perihal, d, status], i) => ({ id: 'sk' + (i + 1), nomor_urut: 28 - i, nomor_surat: `${String(28 - i).padStart(3, '0')}/KKG-PJOK/TT/${['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][new Date().getMonth()]}/${TH}`, tanggal: hari(d), tujuan, perihal, status,
+    file_url: status === 'terkirim' ? svgDoc('Surat Keluar KKG') : null }));
+  db.notulen = [
+    { id: 'nt1', judul: 'Rakor Awal Tahun & Finalisasi Kalender Kerja', kegiatan_id: 'k5', tanggal: hari(-40), pemimpin: 'Budi Santoso, S.Pd.Jas', notulis: 'Siti Rahmawati, S.Pd', status: 'terbit',
+      isi: '1. Iuran kas anggota disepakati Rp20.000 per bulan per guru.\n2. Seleksi O2SN tingkat kecamatan dijadwalkan minggu ke-4 bulan depan.\n3. Penyusunan modul P5 bertema kearifan lokal olahraga pesisir Tegal.\n4. Kehadiran: 38 dari 42 guru.', file_url: svgDoc('Berita Acara Rakor') },
+    { id: 'nt2', judul: 'Musyawarah Penyusunan Juknis O2SN', kegiatan_id: 'k6', tanggal: hari(-75), pemimpin: 'Hendra Setiawan, S.Pd', notulis: 'Siti Rahmawati, S.Pd', status: 'draf',
+      isi: 'Disepakati bahwa seleksi cabang atletik nomor lari 60 meter dan tolak peluru diselenggarakan di Lapangan Koramil Tegal Timur. Seluruh juri wajib membawa lisensi wasit yang masih aktif.' }
+  ];
+  db.dokumen = [
+    ['DOC-SK-2025-01', 'SK Penetapan Pengurus KKG PJOK 2025–2028', 'SK', 'Disdikbud Kota Tegal', 'publik', 4300],
+    ['DOC-ADART-REV3', 'AD/ART KKG PJOK Tegal Timur Hasil Musker', 'AD-ART', 'Musyawarah Kerja 2024', 'anggota', 1800],
+    ['DOC-LPJ-2025-02', 'LPJ Keuangan & Pelaksanaan O2SN SD 2025', 'LPJ', 'Panitia O2SN Tegal Timur', 'internal', 8600],
+    ['DOC-JUKNIS-2025', 'Panduan & Capaian Pembelajaran PJOK Merdeka', 'Juknis', 'Tim Pengembang Kurikulum', 'publik', 6100],
+    ['DOC-LAP-2025', 'Laporan Tahunan KKG 2025', 'Laporan', 'Sekretariat KKG', 'internal', 2400]
+  ].map(([kode, judul, kategori, penerbit, akses, ukuran_kb], i) => ({ id: 'dk' + (i + 1), kode, judul, kategori, penerbit, akses, ukuran_kb, file_url: svgDoc(judul.slice(0, 22)), dibuat_pada: hari(-30 * (i + 1)) }));
+  const statusEfektif = (k) => k.status === 'dibatalkan' ? 'dibatalkan' : k.tanggal > hari(0) ? 'akan_datang' : k.tanggal === hari(0) ? 'berlangsung' : 'selesai';
+  const romawi = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+  const nomorBerikut = (tgl) => { const d = new Date(tgl); const n = Math.max(0, ...db.suratKeluar.filter((x) => new Date(x.tanggal).getFullYear() === d.getFullYear()).map((x) => x.nomor_urut || 0)) + 1;
+    return { n, nomor: db.org.format_nomor_surat.replace('{NO}', String(n).padStart(3, '0')).replace('{ROMAWI}', romawi[d.getMonth()]).replace('{TAHUN}', d.getFullYear()) }; };
+  const SURAT = ['ketua', 'wakil_ketua', 'sekretaris'];
+
+  Object.assign(Data, {
+    kegiatanMendatang: (n = 3) => tunda(db.kegiatan.filter((k) => k.tampil_publik && k.status !== 'dibatalkan' && k.tanggal >= hari(0)).sort((a, b) => a.tanggal.localeCompare(b.tanggal)).slice(0, n)),
+    programDaftar: (tahun) => tunda(db.program.filter((p) => p.tahun === Number(tahun)).sort((a, b) => a.kode.localeCompare(b.kode))),
+    async simpanProgram(row) {
+      perlu('wakil_ketua', 'ketua');
+      const pr = Number(row.progres_persen || 0);
+      const st = pr >= 100 ? 'selesai' : pr > 0 && (row.status || 'belum_mulai') === 'belum_mulai' ? 'berjalan' : (row.status === 'selesai' ? 'berjalan' : row.status || 'belum_mulai');
+      const d = Object.assign({}, row, { progres_persen: pr, status: st, tahun: Number(row.tahun) });
+      if (row.id) Object.assign(db.program.find((p) => p.id === row.id), d);
+      else db.program.push(Object.assign(d, { id: 'pk' + Date.now(), kode: `PRG-${d.tahun}-${String(db.program.filter((p) => p.tahun === d.tahun).length + 1).padStart(2, '0')}` }));
+      return tunda(null);
+    },
+    async hapusProgram(id) { perlu('wakil_ketua', 'ketua'); db.program = db.program.filter((p) => p.id !== id); return tunda(null); },
+
+    async kegiatanDaftar(tahun) {
+      const internal = !!Auth.profil; const aid = Auth.profil && Auth.profil.anggota_id;
+      return tunda(db.kegiatan.filter((k) => (k.tampil_publik || internal) && (!tahun || new Date(k.tanggal).getFullYear() === Number(tahun))).map((k) => {
+        const ps = db.peserta.filter((p) => p.kegiatan_id === k.id); const saya = ps.find((p) => p.anggota_id === aid);
+        return Object.assign({}, k, { status_efektif: statusEfektif(k), program_judul: (db.program.find((p) => p.id === k.program_id) || {}).judul || null,
+          jumlah_peserta: ps.length, jumlah_hadir: ps.filter((p) => p.hadir === 'hadir').length, saya_terdaftar: !!saya, saya_hadir: saya ? saya.hadir : null });
+      }).sort((a, b) => b.tanggal.localeCompare(a.tanggal)));
+    },
+    kegiatanPilihan: () => tunda(db.kegiatan.map((k) => ({ id: k.id, judul: k.judul, tanggal: k.tanggal })).sort((a, b) => b.tanggal.localeCompare(a.tanggal))),
+    async simpanKegiatan(row) {
+      perlu('wakil_ketua', 'ketua');
+      if (row.id) Object.assign(db.kegiatan.find((k) => k.id === row.id), row);
+      else db.kegiatan.push(Object.assign({}, row, { id: 'k' + Date.now(), status: row.status || 'akan_datang', kode: `ACT-${new Date(row.tanggal).getFullYear()}-${String(30 + db.kegiatan.length).padStart(3, '0')}` }));
+      return tunda(null);
+    },
+    async hapusKegiatan(id) { perlu('wakil_ketua', 'ketua'); db.kegiatan = db.kegiatan.filter((k) => k.id !== id); db.peserta = db.peserta.filter((p) => p.kegiatan_id !== id); return tunda(null); },
+    async pesertaKegiatan(id) {
+      perlu('ketua', 'wakil_ketua', 'sekretaris', 'bendahara');
+      return tunda(db.peserta.filter((p) => p.kegiatan_id === id).map((p) => Object.assign({}, p, { anggota: agtById(p.anggota_id) })));
+    },
+    async simpanPresensi(id, data) {
+      perlu('wakil_ketua', 'ketua');
+      data.forEach((e) => {
+        let p = db.peserta.find((x) => x.kegiatan_id === id && x.anggota_id === e.anggota_id);
+        if (!p) { p = { id: 'kp' + Date.now() + e.anggota_id, kegiatan_id: id, anggota_id: e.anggota_id }; db.peserta.push(p); }
+        p.hadir = e.hadir || null; p.catatan = e.catatan || null; p.waktu_hadir = e.hadir === 'hadir' ? (p.waktu_hadir || new Date().toISOString()) : null;
+      });
+      const ps = db.peserta.filter((p) => p.kegiatan_id === id);
+      return tunda({ ok: true, hadir: ps.filter((p) => p.hadir === 'hadir').length, izin: ps.filter((p) => p.hadir === 'izin').length, alpa: ps.filter((p) => p.hadir === 'alpa').length }, 450);
+    },
+    async ikutKegiatan(id) {
+      const aid = Auth.profil.anggota_id;
+      if (!aid) throw new Error('Akun Anda belum ditautkan ke data anggota.');
+      if (db.peserta.some((p) => p.kegiatan_id === id && p.anggota_id === aid)) throw new Error('Data sudah ada (duplikat).');
+      db.peserta.push({ id: 'kp' + Date.now(), kegiatan_id: id, anggota_id: aid, hadir: null }); return tunda(null);
+    },
+    async batalIkut(id) { const aid = Auth.profil.anggota_id; db.peserta = db.peserta.filter((p) => !(p.kegiatan_id === id && p.anggota_id === aid && !p.hadir)); return tunda(null); },
+
+    async surat(jenis) { perlu(...SURAT); return tunda(jenis === 'keluar' ? db.suratKeluar : db.suratMasuk); },
+    async simpanSurat(jenis, row) {
+      perlu('sekretaris');
+      const list = jenis === 'keluar' ? db.suratKeluar : db.suratMasuk;
+      if (row.id) { Object.assign(list.find((x) => x.id === row.id), row); return tunda(null); }
+      const baru = Object.assign({}, row, { id: 's' + Date.now() });
+      if (jenis === 'keluar') { const nb = nomorBerikut(row.tanggal); baru.nomor_urut = nb.n; baru.nomor_surat = nb.nomor; }
+      else baru.nomor_agenda = `AGD-${new Date(row.tanggal).getFullYear()}/${String(43 + db.suratMasuk.length - 4).padStart(3, '0')}`;
+      list.unshift(baru); return tunda(baru);
+    },
+    async hapusSurat(jenis, id) { perlu('sekretaris'); if (jenis === 'keluar') db.suratKeluar = db.suratKeluar.filter((x) => x.id !== id); else db.suratMasuk = db.suratMasuk.filter((x) => x.id !== id); return tunda(null); },
+    nomorSuratBerikutnya: (tgl) => tunda(nomorBerikut(tgl).nomor, 150),
+    async notulen() { perlu(...SURAT); return tunda(db.notulen.map((n) => Object.assign({}, n, { kegiatan: n.kegiatan_id ? db.kegiatan.find((k) => k.id === n.kegiatan_id) : null }))); },
+    async simpanNotulen(row) {
+      perlu('sekretaris');
+      if (row.id) Object.assign(db.notulen.find((n) => n.id === row.id), row); else db.notulen.unshift(Object.assign({}, row, { id: 'nt' + Date.now() }));
+      return tunda(null);
+    },
+    async hapusNotulen(id) { perlu('sekretaris'); db.notulen = db.notulen.filter((n) => n.id !== id); return tunda(null); },
+    async dokumen() {
+      const r = Auth.profil.role;
+      return tunda(db.dokumen.filter((d) => d.akses === 'publik' || d.akses === 'anggota' || ['ketua', 'wakil_ketua', 'sekretaris', 'bendahara'].includes(r)));
+    },
+    async simpanDokumen(row) {
+      perlu('sekretaris');
+      if (row.id) Object.assign(db.dokumen.find((d) => d.id === row.id), row); else db.dokumen.unshift(Object.assign({}, row, { id: 'dk' + Date.now(), dibuat_pada: new Date().toISOString() }));
+      return tunda(null);
+    },
+    async hapusDokumen(id) { perlu('sekretaris'); db.dokumen = db.dokumen.filter((d) => d.id !== id); return tunda(null); }
+  });
+
   function dashDemo(role) {
     const per12 = (f) => Array.from({ length: 12 }, (_, i) => ({ bulan: i + 1, ...f(i) }));
     const bulanIni = new Date().getMonth() + 1;

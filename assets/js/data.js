@@ -270,6 +270,62 @@
       return r;
     },
 
+    // ---------- BATCH 3: program kerja ----------
+    programDaftar: (tahun) => q(sb.from('program_kerja').select('*').eq('tahun', tahun).order('kode')),
+    async simpanProgram(row) {
+      const d = { judul: row.judul, deskripsi: row.deskripsi || null, penanggung_jawab: row.penanggung_jawab || null, target: row.target || null,
+        tanggal_mulai: row.tanggal_mulai || null, tanggal_selesai: row.tanggal_selesai || null, progres_persen: Number(row.progres_persen || 0),
+        status: row.status || 'belum_mulai', tahun: Number(row.tahun) };
+      const r = row.id ? await q(sb.from('program_kerja').update(d).eq('id', row.id)) : await q(sb.from('program_kerja').insert(d));
+      Data.clearDashCache(); return r;
+    },
+    hapusProgram: (id) => q(sb.from('program_kerja').delete().eq('id', id)).then((r) => { Data.clearDashCache(); return r; }),
+
+    // ---------- BATCH 3: kegiatan & kehadiran ----------
+    kegiatanDaftar: (tahun) => q(sb.rpc('daftar_kegiatan', { p_tahun: tahun || null })),
+    kegiatanPilihan: () => q(sb.from('kegiatan').select('id,judul,tanggal').order('tanggal', { ascending: false }).limit(100)),
+    async simpanKegiatan(row) {
+      const d = { judul: row.judul, kategori: row.kategori, program_id: row.program_id || null, tanggal: row.tanggal, jam_mulai: row.jam_mulai || null,
+        jam_selesai: row.jam_selesai || null, lokasi: row.lokasi || null, deskripsi: row.deskripsi || null, kuota: row.kuota ? Number(row.kuota) : null,
+        status: row.status || 'akan_datang', tampil_publik: !!row.tampil_publik };
+      const r = row.id ? await q(sb.from('kegiatan').update(d).eq('id', row.id)) : await q(sb.from('kegiatan').insert(d));
+      Data.clearDashCache(); return r;
+    },
+    hapusKegiatan: (id) => q(sb.from('kegiatan').delete().eq('id', id)),
+    pesertaKegiatan: (id) => q(sb.from('kegiatan_peserta').select('*, anggota(id,nama,nip,sekolah,foto_url)').eq('kegiatan_id', id)),
+    async simpanPresensi(id, data) {
+      const r = await q(sb.rpc('simpan_presensi', { p_kegiatan: id, p_data: data }));
+      Data.clearDashCache(); return r;
+    },
+    ikutKegiatan: (id) => q(sb.from('kegiatan_peserta').insert({ kegiatan_id: id, anggota_id: Auth.profil.anggota_id })),
+    batalIkut: (id) => q(sb.from('kegiatan_peserta').delete().eq('kegiatan_id', id).eq('anggota_id', Auth.profil.anggota_id)),
+
+    // ---------- BATCH 3: persuratan & arsip ----------
+    surat: (jenis) => q(sb.from(jenis === 'keluar' ? 'surat_keluar' : 'surat_masuk').select('*').order('tanggal', { ascending: false }).limit(1000)),
+    simpanSurat(jenis, row) {
+      const t = jenis === 'keluar' ? 'surat_keluar' : 'surat_masuk';
+      const d = jenis === 'keluar'
+        ? { tanggal: row.tanggal, tujuan: row.tujuan, perihal: row.perihal, file_url: row.file_url || null, status: row.status || 'draf' }
+        : { nomor_surat: row.nomor_surat, tanggal_surat: row.tanggal_surat || null, tanggal: row.tanggal, pengirim: row.pengirim, perihal: row.perihal, disposisi: row.disposisi || null, file_url: row.file_url || null };
+      if (jenis === 'keluar' && row.id) d.nomor_surat = row.nomor_surat;
+      return row.id ? q(sb.from(t).update(d).eq('id', row.id)) : q(sb.from(t).insert(d).select().single());
+    },
+    hapusSurat: (jenis, id) => q(sb.from(jenis === 'keluar' ? 'surat_keluar' : 'surat_masuk').delete().eq('id', id)),
+    nomorSuratBerikutnya: (tgl) => q(sb.rpc('nomor_surat_berikutnya', { p_tanggal: tgl })),
+    notulen: () => q(sb.from('notulen').select('*, kegiatan(judul,tanggal)').order('tanggal', { ascending: false }).limit(500)),
+    simpanNotulen(row) {
+      const d = { judul: row.judul, kegiatan_id: row.kegiatan_id || null, tanggal: row.tanggal, pemimpin: row.pemimpin || null, notulis: row.notulis || null,
+        isi: row.isi || null, file_url: row.file_url || null, status: row.status || 'draf' };
+      return row.id ? q(sb.from('notulen').update(d).eq('id', row.id)) : q(sb.from('notulen').insert(d));
+    },
+    hapusNotulen: (id) => q(sb.from('notulen').delete().eq('id', id)),
+    dokumen: () => q(sb.from('dokumen').select('*').order('dibuat_pada', { ascending: false }).limit(1000)),
+    simpanDokumen(row) {
+      const d = { judul: row.judul, kode: row.kode || null, kategori: row.kategori, penerbit: row.penerbit || null, akses: row.akses, file_url: row.file_url || null, ukuran_kb: row.ukuran_kb || null };
+      return row.id ? q(sb.from('dokumen').update(d).eq('id', row.id)) : q(sb.from('dokumen').insert(d));
+    },
+    hapusDokumen: (id) => q(sb.from('dokumen').delete().eq('id', id)),
+
     // Berkas privat lewat GAS
     async bukaBerkas(url) {
       if (!url) throw new Error('Berkas tidak ada.');

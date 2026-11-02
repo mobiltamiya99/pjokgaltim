@@ -194,12 +194,12 @@
   // ------------------------------------------------------------------
   // Cetak / Simpan PDF dengan kop organisasi (via dialog cetak browser)
   // ------------------------------------------------------------------
-  async function cetak({ judul, sub = '', kolom, rows, ttd = [] }) {
+  async function cetakDokumen({ judul, sub = '', body, ttd = [], landscape = false, meta = '' }) {
     const org = await window.KKG.Data.org();
     const now = new Date();
     const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>${esc(judul)}</title>
       <style>
-        @page { size: A4 ${kolom.length > 6 ? 'landscape' : 'portrait'}; margin: 16mm 14mm 18mm; @bottom-right { content: "Halaman " counter(page) " dari " counter(pages); font: 9pt Arial; color: #555; } }
+        @page { size: A4 ${landscape ? 'landscape' : 'portrait'}; margin: 16mm 14mm 18mm; @bottom-right { content: "Halaman " counter(page) " dari " counter(pages); font: 9pt Arial; color: #555; } }
         body { font: 10pt Arial, sans-serif; color: #111; margin: 0; }
         .kop { display: flex; gap: 14px; align-items: center; border-bottom: 3px double #173D72; padding-bottom: 10px; }
         .kop img, .kop .lg { width: 64px; height: 64px; object-fit: contain; }
@@ -212,6 +212,8 @@
         th { background: #173D72; color: #fff; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .03em; padding: 6px; border: 1px solid #173D72; text-align: left; }
         td { border: 1px solid #C9D3E0; padding: 5px 6px; font-size: 9pt; vertical-align: top; }
         tr { page-break-inside: avoid; } thead { display: table-header-group; }
+        .kv td { border: 0; padding: 3px 6px; } .kv td:first-child { width: 150px; color: #444; }
+        .isi { line-height: 1.6; font-size: 10.5pt; white-space: pre-wrap; margin-top: 12px; }
         .meta { display: flex; justify-content: space-between; font-size: 8.5pt; color: #555; margin-top: 8px; }
         .ttd { display: flex; justify-content: space-around; margin-top: 36px; page-break-inside: avoid; }
         .ttd div { text-align: center; min-width: 200px; } .ttd .nm { margin-top: 64px; font-weight: bold; text-decoration: underline; }
@@ -219,9 +221,8 @@
       <div class="kop">${org.logo_url ? `<img src="${esc(org.logo_url)}" alt="">` : '<div class="lg">KKG</div>'}
         <div><h1>${esc((org.nama || '').toUpperCase())}</h1><p>${esc(org.instansi_pembina || '')}</p><p>${esc(org.alamat || '')} · ${esc(org.email || '')}</p></div></div>
       <h2>${esc(judul)}</h2><div class="sub">${esc(sub)}</div>
-      <table><thead><tr><th style="width:28px">No</th>${kolom.map((k) => `<th>${esc(k.label)}</th>`).join('')}</tr></thead>
-      <tbody>${rows.map((r, i) => `<tr><td>${i + 1}</td>${kolom.map((k) => `<td>${esc(k.val ? k.val(r) : r[k.key] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>
-      <div class="meta"><span>Jumlah data: ${rows.length}</span><span>Dicetak: ${fmt.tgl(now)} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}</span></div>
+      ${body}
+      <div class="meta"><span>${meta}</span><span>Dicetak: ${fmt.tgl(now)} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}</span></div>
       ${ttd.length ? `<div class="ttd">${ttd.map((t) => `<div>${esc(t.jabatan)}<div class="nm">${esc(t.nama || '(....................................)')}</div>${t.nip ? `<div>NIP. ${esc(t.nip)}</div>` : ''}</div>`).join('')}</div>` : ''}
       </body></html>`;
     const fr = document.createElement('iframe');
@@ -229,6 +230,30 @@
     document.body.appendChild(fr);
     fr.contentDocument.open(); fr.contentDocument.write(html); fr.contentDocument.close();
     setTimeout(() => { fr.contentWindow.focus(); fr.contentWindow.print(); setTimeout(() => fr.remove(), 2000); }, 400);
+  }
+
+  // Cetak tabel data (laporan daftar)
+  function cetak({ judul, sub = '', kolom, rows, ttd = [] }) {
+    const body = `<table><thead><tr><th style="width:28px">No</th>${kolom.map((k) => `<th${k.lebar ? ` style="width:${k.lebar}"` : ''}>${esc(k.label)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map((r, i) => `<tr><td>${i + 1}</td>${kolom.map((k) => `<td>${esc(k.val ? k.val(r) : r[k.key] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    return cetakDokumen({ judul, sub, body, ttd, landscape: kolom.length > 6, meta: 'Jumlah data: ' + rows.length });
+  }
+
+  // Cetak dokumen naratif (notulen, berita acara): pasangan info + isi teks
+  function cetakIsi({ judul, sub = '', info = [], isi = '', ttd = [] }) {
+    const body = `${info.length ? `<table class="kv">${info.map(([k, v]) => `<tr><td>${esc(k)}</td><td>: ${esc(v || '-')}</td></tr>`).join('')}</table>` : ''}<div class="isi">${esc(isi)}</div>`;
+    return cetakDokumen({ judul, sub, body, ttd });
+  }
+
+  // Siapkan berkas untuk diunggah: gambar dikompres; PDF/Word/Excel maks 5 MB
+  const MIME_DOK = { 'application/pdf': 'PDF', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel' };
+  async function siapkanBerkas(file, { dokumen = true } = {}) {
+    if (!file) throw new Error('Belum ada berkas dipilih.');
+    if (file.type.startsWith('image/')) return window.K.kompresGambar(file, 1600, 0.82);
+    if (!dokumen || !MIME_DOK[file.type]) throw new Error('Format tidak didukung. Gunakan JPG/PNG' + (dokumen ? ', PDF, Word (.docx), atau Excel (.xlsx).' : '.'));
+    if (file.size > 5 * 1024 * 1024) throw new Error('Ukuran berkas maksimal 5 MB.');
+    const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Gagal membaca berkas.')); r.readAsDataURL(file); });
+    return { base64: dataUrl.split(',')[1], mime: file.type, nama: file.name, dataUrl, ukuran: file.size, jenis: MIME_DOK[file.type] };
   }
 
   // Penanda tangan dari pengaturan organisasi (PRD §7.4)
@@ -240,5 +265,5 @@
     return jabatan.map((j) => { const a = cari(L[j][1]); return { jabatan: L[j][0] + ' ' + (org.singkatan || ''), nama: a.nama, nip: a.nip }; });
   }
 
-  window.UI = { tabel, saringLokal, drawer, lihatBerkas, eksporCSV, bacaCSV, cetak, penandatangan, badgeStatus };
+  window.UI = { tabel, saringLokal, drawer, lihatBerkas, eksporCSV, bacaCSV, cetak, cetakIsi, cetakDokumen, siapkanBerkas, penandatangan, badgeStatus };
 })();
