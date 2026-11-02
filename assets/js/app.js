@@ -512,7 +512,7 @@
           <select class="select" id="uStatus" aria-label="Filter status"><option value="">Semua status</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select></div></div>
       <div class="card table-card" style="border-top-left-radius:0;border-top-right-radius:0"><div class="table-wrap"><table class="tbl stack">
         <thead><tr><th class="sortable" data-sort="nama">Nama <i class="bi bi-arrow-down-up"></i></th><th class="sortable" data-sort="email">Email Google <i class="bi bi-arrow-down-up"></i></th>
-          <th class="sortable" data-sort="role">Peran <i class="bi bi-arrow-down-up"></i></th><th>Status</th><th class="sortable" data-sort="terakhir_login">Login Terakhir <i class="bi bi-arrow-down-up"></i></th>${admin ? '<th style="text-align:right">Aksi</th>' : ''}</tr></thead>
+          <th class="sortable" data-sort="role">Peran <i class="bi bi-arrow-down-up"></i></th><th>Status</th><th class="sortable" data-sort="terakhir_login">Login Terakhir <i class="bi bi-arrow-down-up"></i></th>${admin ? '<th class="col-aksi" style="text-align:right">Aksi</th>' : ''}</tr></thead>
         <tbody id="uBody"></tbody></table></div>
         <div class="tbl-foot"><span class="body-sm muted" id="uInfo"></span><div class="pager" id="uPager"></div></div></div>`;
 
@@ -527,7 +527,7 @@
             <td data-label="Peran"><span class="badge ${roleCls[u.role]}">${ROLE_LABEL[u.role]}</span></td>
             <td data-label="Status">${u.status_aktif ? '<span class="badge b-green"><span class="dot"></span>Aktif</span>' : '<span class="badge b-slate">Nonaktif</span>'}</td>
             <td data-label="Login">${u.terakhir_login ? fmt.relatif(u.terakhir_login) : '<span class="muted">Belum pernah</span>'}</td>
-            ${admin ? `<td class="no-label"><div class="actions">
+            ${admin ? `<td class="no-label col-aksi"><div class="actions">
               <button class="btn btn-ghost btn-icon" data-edit="${esc(u.id)}" aria-label="Ubah ${esc(u.nama)}" title="Ubah"><i class="bi bi-pencil-square"></i></button>
               <button class="btn btn-ghost btn-icon" data-tog="${esc(u.id)}" data-aktif="${u.status_aktif}" aria-label="${u.status_aktif ? 'Nonaktifkan' : 'Aktifkan'}" title="${u.status_aktif ? 'Nonaktifkan' : 'Aktifkan'}">
                 <i class="bi ${u.status_aktif ? 'bi-person-x' : 'bi-person-check'}"></i></button></div></td>` : ''}</tr>`).join('')
@@ -622,11 +622,14 @@
   [['anggota', 'Data Anggota'], ['program', 'Program Kerja'], ['agenda', 'Agenda Kegiatan'], ['lomba', 'Jadwal Lomba'], ['prestasi', 'Prestasi Siswa'], ['berita', 'Berita & Pengumuman'], ['dokumentasi', 'Dokumentasi']]
     .forEach(([k, j]) => Router.add('/' + k, () => P.segera(k, j)));
 
-  const HAL = { dashboard, pengaturan, akun, notifikasi };
+  // Registri halaman: modul batch lain menambah lewat window.AppPages
+  const HAL = window.AppPages = Object.assign(window.AppPages || {}, { dashboard, pengaturan, akun, notifikasi });
+  // Perkakas bersama untuk modul halaman
+  window.AppKit = { shell, chart, warna, destroyCharts, boleh, muatBadge, segera, ITEM };
   Router.add(/^\/app\/([\w-]+)$/, async ([id]) => {
     if (!Auth.profil) return Router.go('/masuk');
     if (id !== 'profil' && !boleh(id)) { toast('Menu ini tidak tersedia untuk peran Anda.', 'warning'); return Router.go('/app/dashboard'); }
-    return HAL[id] ? HAL[id]() : segera(id);
+    return HAL[id] ? HAL[id](Router.query()) : segera(id);
   });
 
   // Logout otomatis setelah tidak aktif (PRD §5.10)

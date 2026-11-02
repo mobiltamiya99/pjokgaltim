@@ -189,6 +189,87 @@
       ? q(sb.from('notifikasi').update({ dibaca: true }).eq('id', id))
       : q(sb.from('notifikasi').update({ dibaca: true }).eq('dibaca', false)),
 
+    // ---------- BATCH 2: anggota ----------
+    async anggota({ cari = '', sekolah = '', status = '', publik = '', kepeg = '', halaman = 1, per = 10, urut = 'nama', naik = true, semua = false } = {}) {
+      let x = sb.from('anggota').select('*', { count: 'exact' });
+      cari = String(cari).replace(/[,()*%]/g, ' ').trim();
+      if (cari) x = x.or(`nama.ilike.%${cari}%,nip.ilike.%${cari}%,nuptk.ilike.%${cari}%,sekolah.ilike.%${cari}%`);
+      if (sekolah) x = x.eq('sekolah', sekolah);
+      if (status) x = x.eq('status_aktif', status === 'aktif');
+      if (publik) x = x.eq('tampil_publik', publik === 'ya');
+      if (kepeg) x = x.eq('status_kepegawaian', kepeg);
+      x = x.order(urut || 'nama', { ascending: naik });
+      x = semua ? x.limit(2000) : x.range((halaman - 1) * per, halaman * per - 1);
+      const r = await q(x);
+      return { rows: r.data, total: r.count };
+    },
+    async simpanAnggota(row) {
+      const d = { nama: row.nama, nip: row.nip || null, nuptk: row.nuptk || null, email: row.email ? row.email.toLowerCase() : null,
+        sekolah: row.sekolah, status_kepegawaian: row.status_kepegawaian, no_hp: row.no_hp || null, kompetensi: row.kompetensi || null,
+        foto_url: row.foto_url || null, tampil_publik: !!row.tampil_publik, status_aktif: !!row.status_aktif };
+      const r = row.id ? await q(sb.from('anggota').update(d).eq('id', row.id).select().single()) : await q(sb.from('anggota').insert(d).select().single());
+      Data.clearDashCache(); return r;
+    },
+    hapusAnggota: (id) => q(sb.from('anggota').delete().eq('id', id)).then((r) => { Data.clearDashCache(); return r; }),
+    setPublik: (ids, nilai) => q(sb.from('anggota').update({ tampil_publik: nilai }).in('id', [].concat(ids))),
+    async imporAnggota(rows) {
+      const r = await q(sb.from('anggota').insert(rows).select('id'));
+      Data.clearDashCache(); return r.length;
+    },
+    async detailAnggota(id) {
+      const th = new Date().getFullYear();
+      const [a, iuran, keg, jab] = await Promise.all([
+        q(sb.from('anggota').select('*').eq('id', id).single()),
+        q(sb.from('iuran').select('bulan,status').eq('anggota_id', id).eq('tahun', th)).catch(() => null),
+        q(sb.from('kegiatan_peserta').select('hadir, kegiatan(judul,tanggal)').eq('anggota_id', id).order('terdaftar_pada', { ascending: false }).limit(5)).catch(() => []),
+        q(sb.from('pengurus').select('jabatan,periode_mulai,periode_selesai').eq('anggota_id', id)).catch(() => [])
+      ]);
+      return { anggota: a, iuran, kegiatan: keg, jabatan: jab };
+    },
+
+    // ---------- BATCH 2: pengurus ----------
+    pengurusDaftar: () => q(sb.from('pengurus').select('*, anggota(id,nama,nip,sekolah,foto_url)').order('periode_mulai', { ascending: false }).order('urutan')),
+    simpanPengurus: (row) => {
+      const d = { anggota_id: row.anggota_id, jabatan: row.jabatan, periode_mulai: Number(row.periode_mulai), periode_selesai: Number(row.periode_selesai), urutan: Number(row.urutan || 10), sk_nomor: row.sk_nomor || null };
+      return row.id ? q(sb.from('pengurus').update(d).eq('id', row.id)) : q(sb.from('pengurus').insert(d));
+    },
+    hapusPengurus: (id) => q(sb.from('pengurus').delete().eq('id', id)),
+    async aturUrutan(daftar) { // [{id, urutan}]
+      await Promise.all(daftar.map((p) => q(sb.from('pengurus').update({ urutan: p.urutan }).eq('id', p.id))));
+    },
+
+    // ---------- BATCH 2: pendaftaran ----------
+    pendaftaran: () => q(sb.from('pendaftaran_anggota').select('*').order('dibuat_pada', { ascending: false }).limit(500)),
+    async putuskanPendaftaran(id, setuju, catatan) {
+      const r = await q(sb.rpc('putuskan_pendaftaran', { p_id: id, p_setujui: setuju, p_catatan: catatan }));
+      Data.clearDashCache(); return r;
+    },
+    async aktivasiAkun(id, role) {
+      const r = await q(sb.rpc('aktivasi_akun', { p_pendaftaran_id: id, p_role: role }));
+      Data.clearDashCache(); return r;
+    },
+
+    // ---------- BATCH 2: pengajuan ----------
+    pengajuanDaftar: (milikSaya = false) => q(sb.rpc('daftar_pengajuan', { p_milik_saya: milikSaya })),
+    pengajuanDetail: (id) => q(sb.rpc('detail_pengajuan', { p_id: id })),
+    async putuskanPengajuan(id, setuju, catatan) {
+      const r = await q(sb.rpc('putuskan_pengajuan', { p_id: id, p_setujui: setuju, p_catatan: catatan }));
+      Data.clearDashCache(); return r;
+    },
+    async ajukan({ jenis, ref_id = null, ref_tabel = null, ringkasan, data_usulan = {}, lampiran_url = null }) {
+      const r = await q(sb.from('pengajuan').insert({ jenis, ref_id, ref_tabel, ringkasan, data_usulan, lampiran_url, pengaju_id: Auth.profil.id }).select('id,kode').single());
+      Data.clearDashCache(); return r;
+    },
+
+    // ---------- BATCH 2: profil saya ----------
+    async updateProfilSaya(patch) {
+      const id = Auth.profil.anggota_id;
+      if (!id) throw new Error('Akun Anda belum ditautkan ke data anggota.');
+      const r = await q(sb.from('anggota').update(patch).eq('id', id).select().single());
+      Auth.profil.anggota = Object.assign(Auth.profil.anggota || {}, r);
+      return r;
+    },
+
     // Berkas privat lewat GAS
     async bukaBerkas(url) {
       if (!url) throw new Error('Berkas tidak ada.');

@@ -7,6 +7,7 @@
 (function () {
   'use strict';
   if (!window.KKG || !window.KKG.DEMO) return;
+  document.documentElement.classList.add('is-demo');
   const { Auth, Data } = window.KKG;
   const th = new Date().getFullYear();
   const hari = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
@@ -145,6 +146,173 @@
     bukaBerkas: async (url) => ({ url })
   });
 
+
+  // =================================================================
+  // BATCH 2 — data contoh organisasi & persetujuan
+  // =================================================================
+  const SKL = db.sekolah.map((x) => x.nama);
+  const tambahan = ['Rahmat Hidayat, S.Pd', 'Siti Maryam, S.Pd.SD', 'Bambang Triyono, S.Pd', 'Ahmad Fauzi, S.Pd', 'Dewi Lestari, S.Pd',
+    'Joko Susilo, S.Pd.Jas', 'Lina Marlina, S.Pd', 'Eko Prasetyo, S.Or', 'Wulan Sari, S.Pd', 'Yusuf Maulana, S.Pd', 'Indah Permata, S.Pd',
+    'Arif Rahman, S.Or', 'Nanik Sulistyowati, S.Pd', 'Teguh Wibowo, S.Pd', 'Fitri Handayani, S.Pd', 'Heru Santosa, M.Pd'];
+  const KOMP = ['Atletik & Senam', 'Bulutangkis & Renang', 'Sepak Bola & Futsal', 'Pencak Silat', 'Bola Voli & Kebugaran', 'Tenis Meja & Catur', 'Renang & Akuatik'];
+  const KEPEG = ['PNS', 'PNS', 'PNS', 'PPPK', 'Honorer'];
+  db.anggota = db.anggota.concat(tambahan.map((nama, i) => ({ id: 'b' + (i + 1), nama, sekolah: SKL[(i * 5 + 3) % SKL.length] })))
+    .map((a, i) => Object.assign(a, {
+      nip: i % 7 === 6 ? null : String(198000000000000000n + BigInt(i) * 10101010101n + 2008011000n).slice(0, 18),
+      nuptk: String(4000000000000000 + i * 1234567).slice(0, 16),
+      email: a.email || a.nama.toLowerCase().replace(/,.*$/, '').replace(/[^a-z]+/g, '.') + '@gmail.com',
+      status_kepegawaian: KEPEG[i % KEPEG.length], no_hp: i % 4 === 3 ? null : '0812' + String(30000000 + i * 7919).slice(0, 8),
+      kompetensi: KOMP[i % KOMP.length], foto_url: null, tampil_publik: i % 3 !== 2, status_aktif: i !== 13 && i !== 20,
+      tanggal_gabung: hari(-30 * (i + 1))
+    }));
+  db.pengurus = [['a1', 'Ketua', 1], ['a2', 'Wakil Ketua', 2], ['a3', 'Sekretaris', 3], ['a4', 'Bendahara', 4], ['a5', 'Admin IT & Publikasi', 5]]
+    .map(([aid, jabatan, urutan], i) => ({ id: 'p' + (i + 1), anggota_id: aid, jabatan, urutan, periode_mulai: 2025, periode_selesai: 2028, sk_nomor: '421.2/084/KKG-PJOK/2025' }));
+  db.pendaftaran = [
+    { id: 'd1', nama: 'Rizky Ananda, S.Pd', nip: '199605142022121002', email: 'rizky.ananda@gmail.com', sekolah: 'SD Negeri Slerok 1', no_hp: '0821-4421-9930', status: 'menunggu', dibuat_pada: new Date(Date.now() - 3 * 36e5).toISOString() },
+    { id: 'd2', nama: 'Dewi Anggraeni, S.Pd', nip: '199203102020122005', email: 'dewi.anggraeni@gmail.com', sekolah: 'SD Negeri Kejambon 2', no_hp: null, status: 'menunggu', dibuat_pada: new Date(Date.now() - 26 * 36e5).toISOString() },
+    { id: 'd3', nama: 'Fajar Nugroho, S.Or', nip: '199811052023211004', email: 'fajar.nugroho@gmail.com', sekolah: 'SD Negeri Mintaragen 3', no_hp: '0857-1100-2299', status: 'disetujui', catatan: 'Data lengkap, SK tugas valid.', diputus_pada: hari(-1), dibuat_pada: hari(-4) },
+    { id: 'd4', nama: 'Sri Wahyuni, S.Pd', nip: '198707232010012011', email: 'sri.w@gmail.com', sekolah: 'SD Negeri Panggung 2', no_hp: '0813-9090-1212', status: 'aktif', catatan: 'Disetujui.', diputus_pada: hari(-10), dibuat_pada: hari(-12) },
+    { id: 'd5', nama: 'Andi Saputra', nip: '200101012024011001', email: 'andi.s@gmail.com', sekolah: 'SD Negeri Slerok 2', no_hp: null, status: 'ditolak', catatan: 'Bukan guru PJOK di wilayah Tegal Timur.', diputus_pada: hari(-6), dibuat_pada: hari(-7) }
+  ];
+  const svgDoc = (judul) => 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800"><rect width="600" height="800" fill="#fff"/><rect x="40" y="40" width="520" height="70" fill="#173D72"/><text x="60" y="85" font-family="Arial" font-size="24" fill="#fff">${judul}</text>${Array.from({ length: 14 }, (_, i) => `<rect x="60" y="${150 + i * 34}" width="${300 + (i * 37) % 180}" height="12" rx="6" fill="#D6E0EC"/>`).join('')}<text x="380" y="740" font-family="Arial" font-size="16" fill="#5B6B82">Tanda tangan &amp; stempel</text></svg>`);
+  db.pengajuan = [
+    { id: 'q1', kode: 'REQ-2026-0089', jenis: 'perubahan_data', ref_id: 'a5', pengaju_id: 'u6', ringkasan: 'Pembaruan gelar akademik & mutasi sekolah', status: 'menunggu', dibuat_pada: new Date(Date.now() - 5 * 36e5).toISOString(),
+      data_usulan: { nama: 'Agus Priyono, M.Pd', sekolah: 'SD Negeri Kejambon 2', alasan: 'Saya telah lulus Magister Pendidikan dan mendapat SK mutasi ke SD Negeri Kejambon 2 per 1 Oktober.' }, lampiran_url: svgDoc('SK Mutasi Disdikbud') },
+    { id: 'q2', kode: 'REQ-2026-0090', jenis: 'usulan_kegiatan', pengaju_id: 'u7', ringkasan: 'Klinik Pembelajaran Atletik Aman untuk Siswa SD', status: 'menunggu', dibuat_pada: new Date(Date.now() - 20 * 36e5).toISOString(),
+      data_usulan: { judul: 'Klinik Pembelajaran Atletik Aman', tanggal: hari(21), lokasi: 'Lapangan SD Negeri Mintaragen 1', deskripsi: 'Pelatihan teknik lari, lompat, dan lempar yang aman bagi siswa kelas rendah.' } },
+    { id: 'q3', kode: 'REQ-2026-0091', jenis: 'peserta_lomba', pengaju_id: 'u6', ringkasan: '3 atlet sprint 60 m & lompat jauh — O2SN', status: 'menunggu', dibuat_pada: hari(-1),
+      data_usulan: { lomba: 'O2SN Kota Tegal', cabang: 'Atletik', nama_siswa: 'Ahmad Fauzan R., Bima Arya, Citra Lestari', kelas: '5–6' } },
+    { id: 'q4', kode: 'REQ-2026-0092', jenis: 'prestasi', pengaju_id: 'u7', ringkasan: 'Juara 1 Pencak Silat Tunggal Putri', status: 'menunggu', dibuat_pada: hari(-2),
+      data_usulan: { nama_siswa: 'Nadia Putri', kelas: '5', lomba: 'POPDA Kota Tegal', cabang: 'Pencak Silat', peringkat: 'juara_1' }, lampiran_url: svgDoc('Sertifikat Juara 1') },
+    { id: 'q5', kode: 'REQ-2026-0093', jenis: 'bukti_bayar', pengaju_id: 'u6', ringkasan: 'Iuran Oktober 2026 (transfer)', status: 'menunggu', dibuat_pada: hari(-1),
+      data_usulan: { bulan: [10], nominal: 20000 }, lampiran_url: svgDoc('Bukti Transfer BRI') },
+    { id: 'q6', kode: 'REQ-2026-0071', jenis: 'perubahan_data', ref_id: 'a6', pengaju_id: 'u7', ringkasan: 'Koreksi NIP', status: 'ditolak', dibuat_pada: hari(-15),
+      data_usulan: { nip: '199105182019032016', alasan: 'Salah ketik NIP.' },
+      riwayat: [{ keputusan: 'ditolak', catatan: 'Mohon lampirkan SK CPNS sebagai bukti NIP yang benar.', pemutus: 'Siti Rahmawati, S.Pd', waktu: hari(-14) }] }
+  ];
+  const PEMUTUS = { perubahan_data: ['ketua', 'sekretaris'], usulan_kegiatan: ['ketua', 'wakil_ketua'], peserta_lomba: ['ketua', 'sekretaris'], prestasi: ['ketua', 'sekretaris'], bukti_bayar: ['bendahara'] };
+  const bolehPutus = (j) => !!Auth.profil && (PEMUTUS[j] || []).includes(Auth.profil.role);
+  const perlu = (...peran) => { if (!Auth.profil || !peran.includes(Auth.profil.role)) throw new Error('Anda tidak memiliki izin untuk tindakan ini.'); };
+  const agtById = (id) => db.anggota.find((a) => a.id === id);
+  const usrById = (id) => db.pengguna.find((u) => u.id === id) || {};
+  const formatPengajuan = (p) => {
+    const u = usrById(p.pengaju_id); const a = agtById(u.anggota_id) || {};
+    const r = p.riwayat || [];
+    return Object.assign({}, p, { bisa_putus: bolehPutus(p.jenis), pengaju_nama: u.nama, pengaju_email: u.email, pengaju_nip: a.nip, pengaju_sekolah: a.sekolah,
+      keputusan_terakhir: r.length ? r[r.length - 1] : null });
+  };
+  const masukDemoAsli = Auth.masukDemo;
+  Auth.masukDemo = (role, simpan) => {
+    const p = masukDemoAsli(role, simpan);
+    const a = agtById(p.anggota_id);
+    if (a) p.anggota = Object.assign({}, a);
+    return p;
+  };
+  if (Auth.profil) Auth.masukDemo(Auth.profil.role, false);
+
+  Object.assign(Data, {
+    anggotaPilihan: () => tunda(db.anggota.filter((a) => a.status_aktif).sort((x, y) => x.nama.localeCompare(y.nama))),
+    async anggota(st = {}) {
+      perlu('admin_it', 'ketua', 'wakil_ketua', 'sekretaris', 'bendahara');
+      const s = Object.assign({ halaman: 1, per: 10, urut: 'nama', naik: true }, st);
+      const r = window.UI.saringLokal(db.anggota, s, { cari: ['nama', 'nip', 'nuptk', 'sekolah'], filter: {
+        sekolah: (x, v) => x.sekolah === v, status: (x, v) => x.status_aktif === (v === 'aktif'),
+        publik: (x, v) => x.tampil_publik === (v === 'ya'), kepeg: (x, v) => x.status_kepegawaian === v } });
+      return tunda(s.semua ? { rows: r.semua, total: r.total } : { rows: r.rows, total: r.total });
+    },
+    async simpanAnggota(row) {
+      perlu('sekretaris');
+      if (row.nip && db.anggota.some((a) => a.nip === row.nip && a.id !== row.id)) throw new Error('Data sudah ada (duplikat): NIP sudah terdaftar.');
+      if (row.id) Object.assign(agtById(row.id), row); else db.anggota.push(Object.assign({ id: 'n' + Date.now(), tanggal_gabung: hari(0) }, row));
+      return tunda(row);
+    },
+    async hapusAnggota(id) { perlu('sekretaris'); db.anggota = db.anggota.filter((a) => a.id !== id); return tunda(null); },
+    async setPublik(ids, v) { perlu('sekretaris'); [].concat(ids).forEach((i) => { agtById(i).tampil_publik = v; }); return tunda(null, 250); },
+    async imporAnggota(rows) {
+      perlu('sekretaris', 'admin_it');
+      rows.forEach((r, i) => db.anggota.push(Object.assign({ id: 'imp' + Date.now() + i, status_aktif: true, tampil_publik: false, tanggal_gabung: hari(0) }, r)));
+      return tunda(rows.length, 600);
+    },
+    async detailAnggota(id) {
+      const a = agtById(id);
+      const bln = new Date().getMonth() + 1;
+      return tunda({ anggota: a, iuran: Array.from({ length: bln }, (_, i) => ({ bulan: i + 1, status: (i + a.nama.length) % 5 === 0 ? 'menunggu' : 'lunas' })).filter((_, i) => i < bln - (a.nama.length % 3)),
+        kegiatan: db.kegiatan.slice(0, 3).map((k, i) => ({ hadir: i === 2 ? null : 'hadir', kegiatan: { judul: k.judul, tanggal: k.tanggal } })),
+        jabatan: db.pengurus.filter((p) => p.anggota_id === id) });
+    },
+    pengurusDaftar: () => tunda(db.pengurus.map((p) => Object.assign({}, p, { anggota: agtById(p.anggota_id) })).sort((a, b) => a.urutan - b.urutan)),
+    async simpanPengurus(row) {
+      perlu('sekretaris');
+      const d = Object.assign({}, row, { periode_mulai: Number(row.periode_mulai), periode_selesai: Number(row.periode_selesai), urutan: Number(row.urutan || 10) });
+      if (row.id) Object.assign(db.pengurus.find((p) => p.id === row.id), d); else db.pengurus.push(Object.assign({ id: 'p' + Date.now() }, d));
+      return tunda(null);
+    },
+    async hapusPengurus(id) { perlu('sekretaris'); db.pengurus = db.pengurus.filter((p) => p.id !== id); return tunda(null); },
+    async aturUrutan(list) { perlu('sekretaris'); list.forEach((x) => { db.pengurus.find((p) => p.id === x.id).urutan = x.urutan; }); return tunda(null, 200); },
+
+    async pendaftaran() { perlu('admin_it', 'ketua', 'wakil_ketua', 'sekretaris'); return tunda(db.pendaftaran); },
+    async putuskanPendaftaran(id, setuju, catatan) {
+      perlu('ketua', 'sekretaris');
+      if (String(catatan || '').trim().length < 5) throw new Error('Catatan keputusan wajib diisi (min. 5 karakter).');
+      const d = db.pendaftaran.find((x) => x.id === id);
+      if (!d || d.status !== 'menunggu') throw new Error('Pendaftaran tidak ditemukan atau sudah diputus.');
+      Object.assign(d, { status: setuju ? 'disetujui' : 'ditolak', catatan, diputus_pada: new Date().toISOString() });
+      return tunda({ ok: true, status: d.status }, 400);
+    },
+    async aktivasiAkun(id, role) {
+      perlu('admin_it');
+      const d = db.pendaftaran.find((x) => x.id === id);
+      if (!d || d.status !== 'disetujui') throw new Error('Pendaftaran belum disetujui Ketua/Sekretaris.');
+      const aid = 'n' + Date.now();
+      db.anggota.push({ id: aid, nama: d.nama, nip: d.nip, email: d.email, sekolah: d.sekolah, no_hp: d.no_hp, status_kepegawaian: 'PNS', status_aktif: true, tampil_publik: false, tanggal_gabung: hari(0) });
+      db.pengguna.push({ id: 'u' + Date.now(), email: d.email, nama: d.nama, role, status_aktif: true, terakhir_login: null, anggota_id: aid, anggota: { sekolah: d.sekolah } });
+      d.status = 'aktif';
+      return tunda({ ok: true }, 500);
+    },
+
+    async pengajuanDaftar(milik = false) {
+      const p = Auth.profil;
+      return tunda(db.pengajuan.filter((x) => milik ? x.pengaju_id === p.id : (x.pengaju_id === p.id || bolehPutus(x.jenis) || p.role === 'ketua')).map(formatPengajuan));
+    },
+    async pengajuanDetail(id) {
+      const x = db.pengajuan.find((q) => q.id === id);
+      const p = Auth.profil;
+      if (!x || !(x.pengaju_id === p.id || bolehPutus(x.jenis) || p.role === 'ketua')) throw new Error('Pengajuan tidak ditemukan atau tidak berwenang.');
+      const u = usrById(x.pengaju_id); const a = agtById(u.anggota_id) || {};
+      const lama = x.jenis === 'perubahan_data' ? agtById(x.ref_id) : null;
+      return tunda(Object.assign({}, x, { bisa_putus: bolehPutus(x.jenis) && x.status === 'menunggu',
+        pengaju: { nama: u.nama, email: u.email, role: u.role, nip: a.nip, sekolah: a.sekolah, foto_url: a.foto_url, no_hp: a.no_hp },
+        data_lama: lama ? { nama: lama.nama, nip: lama.nip, sekolah: lama.sekolah } : null, riwayat: x.riwayat || [] }));
+    },
+    async putuskanPengajuan(id, setuju, catatan) {
+      const x = db.pengajuan.find((q) => q.id === id);
+      if (!x) throw new Error('Pengajuan tidak ditemukan.');
+      if (x.status !== 'menunggu') throw new Error('Pengajuan sudah diputus.');
+      if (!bolehPutus(x.jenis)) throw new Error('Anda tidak berwenang memutus pengajuan ini.');
+      if (String(catatan || '').trim().length < 5) throw new Error('Catatan keputusan wajib diisi (min. 5 karakter).');
+      x.status = setuju ? 'disetujui' : 'ditolak';
+      (x.riwayat = x.riwayat || []).push({ keputusan: x.status, catatan, pemutus: Auth.profil.nama, waktu: new Date().toISOString() });
+      if (setuju && x.jenis === 'perubahan_data') { const a = agtById(x.ref_id); ['nama', 'nip', 'sekolah'].forEach((k) => { if (x.data_usulan[k]) a[k] = x.data_usulan[k]; }); }
+      return tunda({ ok: true, status: x.status }, 450);
+    },
+    async ajukan(d) {
+      const p = Auth.profil;
+      if (d.jenis === 'perubahan_data') {
+        if (d.ref_id !== p.anggota_id) throw new Error('Perubahan data hanya dapat diajukan untuk data Anda sendiri.');
+        if (db.pengajuan.some((x) => x.jenis === 'perubahan_data' && x.ref_id === d.ref_id && x.status === 'menunggu')) throw new Error('Masih ada pengajuan perubahan data yang menunggu keputusan.');
+      }
+      const kode = 'REQ-' + new Date().getFullYear() + '-' + String(100 + db.pengajuan.length).padStart(4, '0');
+      db.pengajuan.unshift(Object.assign({ id: 'q' + Date.now(), kode, pengaju_id: p.id, status: 'menunggu', dibuat_pada: new Date().toISOString() }, d));
+      return tunda({ kode }, 500);
+    },
+    async updateProfilSaya(patch) {
+      const a = agtById(Auth.profil.anggota_id);
+      if (!a) throw new Error('Akun Anda belum ditautkan ke data anggota.');
+      Object.assign(a, patch); Auth.profil.anggota = Object.assign({}, a);
+      return tunda(a);
+    }
+  });
+
   function dashDemo(role) {
     const per12 = (f) => Array.from({ length: 12 }, (_, i) => ({ bulan: i + 1, ...f(i) }));
     const bulanIni = new Date().getMonth() + 1;
@@ -189,6 +357,13 @@
         ['Hendra Setiawan, S.Pd', 'INSERT', 'kegiatan', 20], ['Fajar Prasetyo', 'UPDATE', 'pengaturan_organisasi', 26], ['Siti Rahmawati, S.Pd', 'INSERT', 'berita', 48]
       ].map(([nama_aktor, aksi, tabel, jam]) => ({ nama_aktor, aksi, tabel, waktu: new Date(Date.now() - jam * 36e5).toISOString() }));
     }
+    // hitung ulang pengajuan menunggu dari data demo (ikut berubah setelah keputusan)
+    const pm = {};
+    db.pengajuan.filter((x) => x.status === 'menunggu' && (role === 'anggota' ? x.pengaju_id === (Auth.profil || {}).id : (PEMUTUS[x.jenis] || []).includes(role)))
+      .forEach((x) => { pm[x.jenis] = (pm[x.jenis] || 0) + 1; });
+    if (['ketua', 'sekretaris'].includes(role)) pm.pendaftaran_anggota = db.pendaftaran.filter((x) => x.status === 'menunggu').length;
+    if (role === 'admin_it') pm.aktivasi_akun = db.pendaftaran.filter((x) => x.status === 'disetujui').length;
+    out.pengajuan_menunggu = pm;
     return out;
   }
 })();
