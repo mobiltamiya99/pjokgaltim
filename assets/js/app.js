@@ -652,8 +652,33 @@
   }
   ['click', 'keydown', 'mousemove', 'touchstart'].forEach((ev) => document.addEventListener(ev, debounce(resetIdle, 1000), { passive: true }));
 
+  // Aplikasi asli tetapi config.js belum benar → tampilkan petunjuk, bukan data contoh
+  function halamanSetup() {
+    const g = window.KKG.galatKonfig;
+    $('#root').innerHTML = `<div class="container" style="max-width:760px;padding:48px 16px">
+      <div class="card"><div style="display:flex;gap:14px;align-items:center;margin-bottom:16px"><span class="icon-tile amber"><i class="bi bi-plug"></i></span>
+        <div><h1 style="font-size:22px">Aplikasi belum terhubung ke database</h1><p class="muted">File <code>assets/js/config.js</code> di GitHub belum diisi dengan benar.</p></div></div>
+        <div class="alert error" style="margin-bottom:16px"><i class="bi bi-x-circle"></i><div>${g.map((x) => esc(x)).join('<br>')}</div></div>
+        <ol style="padding-left:20px;display:grid;gap:8px;line-height:1.6">
+          <li>Buka Supabase → proyek Anda → <b>Settings → API Keys</b> / <b>Data API</b>: salin <b>Project URL</b> dan <b>Publishable key</b>.</li>
+          <li>Buka script.google.com → proyek KKG → <b>Deploy → Manage deployments</b>: salin <b>Web app URL</b> (berakhiran <code>/exec</code>).</li>
+          <li>Di GitHub: folder <b>assets/js</b> → <b>config.js</b> → ikon pensil ✏️ → isi ketiga nilai di antara tanda kutip → <b>Commit changes</b>.</li>
+          <li>Tunggu 1–2 menit, lalu buka ulang halaman ini dengan <b>Ctrl + F5</b>.</li></ol>
+        <p class="help" style="margin-top:14px">Jangan pernah menaruh <b>Secret key</b> (sb_secret_…) di config.js. Ingin melihat contoh tampilan dulu? Buka <a href="demo.html">demo.html</a>.</p></div></div>`;
+    const ld = $('#loader'); if (ld) { ld.classList.add('done'); setTimeout(() => ld.remove(), 350); }
+  }
+
   async function boot() {
     Theme.apply(Theme.get());
+    if (window.KKG.BELUM_SIAP) return halamanSetup();
+    if (!window.KKG.DEMO && !window.KKG.sb) {
+      $('#root').innerHTML = `<div class="container" style="max-width:640px;padding:48px 16px"><div class="card">${emptyState('Gagal memuat komponen aplikasi',
+        'Pustaka Supabase dari internet tidak termuat. Periksa koneksi internet, matikan pemblokir iklan untuk situs ini, lalu muat ulang halaman.', 'bi-wifi-off',
+        '<button class="btn btn-primary" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i> Muat ulang</button>')}</div></div>`;
+      const ld = $('#loader'); if (ld) { ld.classList.add('done'); setTimeout(() => ld.remove(), 350); }
+      return;
+    }
+    if (window.KKG.galatKonfig.length) console.warn('[KKG] ' + window.KKG.galatKonfig.join(' '));
     try {
       await Auth.init();
       if (Auth.profil && (!location.hash || location.hash === '#/' || location.hash === '#/masuk')) {

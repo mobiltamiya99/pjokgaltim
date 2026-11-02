@@ -6,10 +6,29 @@
 (function () {
   'use strict';
   const C = window.APP_CONFIG || {};
-  const DEMO = !C.SUPABASE_URL || !C.SUPABASE_ANON_KEY;
+  C.SUPABASE_URL = String(C.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  C.SUPABASE_ANON_KEY = String(C.SUPABASE_ANON_KEY || '').trim();
+  C.GAS_URL = String(C.GAS_URL || '').trim();
+  // index.html (aplikasi asli) memasang window.KKG_PRODUKSI = true; demo.html tidak.
+  const PRODUKSI = !!window.KKG_PRODUKSI;
+  const KOSONG = !C.SUPABASE_URL || !C.SUPABASE_ANON_KEY;
+  const DEMO = KOSONG && !PRODUKSI;
+
+  // Periksa isi config.js agar salah isi terdeteksi dengan pesan yang jelas
+  const galatKonfig = [];
+  if (PRODUKSI) {
+    if (!C.SUPABASE_URL) galatKonfig.push('SUPABASE_URL belum diisi.');
+    else if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(C.SUPABASE_URL)) galatKonfig.push('SUPABASE_URL harus berbentuk https://<Project ID>.supabase.co (bukan alamat GitHub Pages atau dashboard).');
+    if (!C.SUPABASE_ANON_KEY) galatKonfig.push('SUPABASE_ANON_KEY belum diisi.');
+    else if (/^sb_secret_/.test(C.SUPABASE_ANON_KEY)) galatKonfig.push('BAHAYA: SUPABASE_ANON_KEY berisi Secret key. Segera ganti dengan Publishable key (sb_publishable_…) dan buat ulang Secret key di Supabase.');
+    else if (!/^(sb_publishable_|eyJ)/.test(C.SUPABASE_ANON_KEY)) galatKonfig.push('SUPABASE_ANON_KEY tidak dikenali. Gunakan Publishable key (sb_publishable_…).');
+    if (!C.GAS_URL) galatKonfig.push('GAS_URL belum diisi (diperlukan untuk unggah berkas, email, dan PDF laporan).');
+    else if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(C.GAS_URL)) galatKonfig.push('GAS_URL harus berbentuk https://script.google.com/macros/s/…/exec (salin dari Deploy → Manage deployments).');
+  }
+  const BELUM_SIAP = PRODUKSI && galatKonfig.some((g) => !/^GAS_URL/.test(g));
 
   let sb = null;
-  if (!DEMO && window.supabase) {
+  if (!DEMO && !BELUM_SIAP && window.supabase) {
     sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY, {
       auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
@@ -449,5 +468,5 @@
     uploadPendaftaran: GAS.uploadPendaftaran
   };
 
-  window.KKG = { DEMO, sb, Auth, Data, GAS, cache };
+  window.KKG = { DEMO, PRODUKSI, BELUM_SIAP, galatKonfig, sb, Auth, Data, GAS, cache };
 })();

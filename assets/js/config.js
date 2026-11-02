@@ -1,15 +1,16 @@
 /**
- * KONFIGURASI APLIKASI — isi 3 nilai ini setelah setup Supabase & GAS.
- * Jika SUPABASE_URL masih kosong, aplikasi berjalan dalam MODE DEMO
- * (data contoh di browser, tanpa login Google) agar tampilan bisa dicoba.
+ * KONFIGURASI APLIKASI KKG PJOK TEGAL TIMUR (produksi)
  *
- * Anon key AMAN diletakkan di sini (dilindungi RLS). JANGAN pernah
- * menaruh service_role key di frontend.
+ * Publishable key AMAN diletakkan di sini (data dilindungi RLS Supabase).
+ * JANGAN pernah menaruh Secret key (sb_secret_…) / service_role di file ini —
+ * kunci itu hanya boleh ada di Script Properties Google Apps Script.
+ *
+ * Tampilan contoh tanpa database tersedia di demo.html.
  */
 window.APP_CONFIG = {
-  SUPABASE_URL: '',              // 'https://sbfyhbxzpmpuhirckwsw.supabase.co'
-  SUPABASE_ANON_KEY: '',         // 'sb_publishable_2hA7KocBkSeuUybM7igo2Q_At-evQe-'
-  GAS_URL: '',                   // 'https://script.google.com/macros/s/AKfycbzDIiFimEp5kiX3Sy9tBDqPFZhBXgB3Nk3p1fCr95dhjuDnp8dHMzgi4TI5OBTFxXNOYw/exec'
+  SUPABASE_URL: 'https://sbfyhbxzpmpuhirckwsw.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_2hA7KocBkSeuUybM7igo2Q_At-evQe-',
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbzDIiFimEp5kiX3Sy9tBDqPFZhBXgB3Nk3p1fCr95dhjuDnp8dHMzgi4TI5OBTFxXNOYw/exec',
 
   APP_NAME: 'KKG PJOK Tegal Timur',
   SESSION_IDLE_MINUTES: 30       // logout otomatis bila tidak aktif (PRD §5.10)
