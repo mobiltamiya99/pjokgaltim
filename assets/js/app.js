@@ -294,12 +294,12 @@
         kpi('amber', 'bi-wallet2', 'Ringkasan Saldo', d.keuangan_ringkas ? fmt.rpSingkat(d.keuangan_ringkas.saldo) : '-', '', `Iuran bulan ini ${d.keuangan_ringkas ? d.keuangan_ringkas.iuran_persen_bulan_ini : 0}%`)],
       sekretaris: () => [
         kpi('navy', 'bi-people-fill', 'Anggota Aktif', fmt.num(agt.aktif), 'guru', `${agt.negeri} SD Negeri · ${agt.swasta} Swasta`),
-        kpi('amber', 'bi-person-plus', 'Pendaftar Menunggu', fmt.num(pm.pendaftaran_anggota || 0), 'orang', 'Perlu verifikasi'),
+        kpi('amber', 'bi-person-plus', 'Pendaftar Menunggu', fmt.num(pm.pendaftaran_anggota || 0), 'orang', 'Perlu persetujuan'),
         kpi('deep', 'bi-check2-square', 'Pengajuan Pending', totalPm - (pm.pendaftaran_anggota || 0), 'berkas', 'Data, lomba, prestasi'),
         kpi('teal', 'bi-trophy-fill', 'Prestasi Tahun Ini', medTotal, 'medali', `${(d.medali || {}).juara_1 || 0} emas`)],
       admin_it: () => [
         kpi('navy', 'bi-people-fill', 'Anggota Aktif', fmt.num(agt.aktif), 'guru', `${agt.nonaktif} nonaktif`),
-        kpi('amber', 'bi-person-check', 'Menunggu Aktivasi', fmt.num(pm.aktivasi_akun || 0), 'akun', 'Sudah disetujui pengurus'),
+        kpi('amber', 'bi-person-plus', 'Pendaftar Menunggu', fmt.num(pm.pendaftaran_anggota || 0), 'orang', 'Perlu persetujuan'),
         kpi('teal', 'bi-person-plus', 'Anggota Baru', fmt.num(agt.baru_bulan_ini), 'bulan ini', 'Bergabung bulan berjalan'),
         kpi('deep', 'bi-activity', 'Aktivitas Terbaru', (d.aktivitas || []).length, 'catatan', 'Lihat linimasa di bawah')],
       anggota: () => (() => {
@@ -402,18 +402,19 @@
   }
 
   // ------------------------------------------------------------------
-  // PENGATURAN ORGANISASI (Admin IT ubah; Ketua & Sekretaris lihat)
+  // PENGATURAN ORGANISASI (Admin IT & Sekretaris ubah — logo hanya Admin IT; Ketua lihat)
   // ------------------------------------------------------------------
   async function pengaturan() {
     const el = await shell('pengaturan', 'Pengaturan Organisasi', 'Identitas, penandatangan, iuran, penomoran surat');
-    const bisaUbah = Auth.profil.role === 'admin_it';
+    const bisaUbah = ['admin_it', 'sekretaris'].includes(Auth.profil.role);
+    const bisaLogo = Auth.profil.role === 'admin_it';
     el.innerHTML = '<div class="skel skel-block" style="height:400px"></div>';
     const [org, anggota] = await Promise.all([Data.org(true), Data.anggotaPilihan().catch(() => [])]);
     const opsi = (sel) => `<option value="">— Pilih anggota —</option>` + anggota.map((a) => `<option value="${esc(a.id)}" ${a.id === sel ? 'selected' : ''}>${esc(a.nama)}</option>`).join('');
     const dis = bisaUbah ? '' : 'disabled';
     el.innerHTML = `
       <div class="page-head"><div><h1>Pengaturan Organisasi</h1><p>Data ini dipakai di website publik, kop laporan, dan penomoran surat.</p></div>
-        ${bisaUbah ? '' : '<span class="badge b-slate"><i class="bi bi-lock"></i> Hanya Admin IT yang dapat mengubah</span>'}</div>
+        ${bisaUbah ? (bisaLogo ? '' : '<span class="badge b-slate"><i class="bi bi-lock"></i> Logo hanya dapat diubah Admin IT</span>') : '<span class="badge b-slate"><i class="bi bi-lock"></i> Hanya Admin IT & Sekretaris yang dapat mengubah</span>'}</div>
       <form id="orgForm" novalidate>
       <div class="dash-grid">
         <section class="card span-8"><div class="card-title"><h3><i class="bi bi-building" style="color:var(--teal)"></i> Identitas Organisasi</h3></div>
@@ -432,8 +433,8 @@
         </section>
         <div class="span-4" style="display:flex;flex-direction:column;gap:20px">
           <section class="card"><div class="card-title"><h3>Logo Organisasi</h3></div>
-            <div class="dropzone" id="logoDz" ${bisaUbah ? 'tabindex="0" role="button"' : ''}><span class="preview" id="logoPrev">${org.logo_url ? `<img src="${esc(org.logo_url)}" alt="Logo">` : '<i class="bi bi-image"></i>'}</span>
-              <span class="body-sm">${bisaUbah ? '<b>Ganti logo</b><br><span class="help">PNG/JPG persegi, dikompres otomatis.</span>' : 'Logo hanya dapat diubah Admin IT.'}</span></div>
+            <div class="dropzone" id="logoDz" ${bisaLogo ? 'tabindex="0" role="button"' : ''}><span class="preview" id="logoPrev">${org.logo_url ? `<img src="${esc(org.logo_url)}" alt="Logo">` : '<i class="bi bi-image"></i>'}</span>
+              <span class="body-sm">${bisaLogo ? '<b>Ganti logo</b><br><span class="help">PNG/JPG persegi, dikompres otomatis.</span>' : 'Logo hanya dapat diubah Admin IT.'}</span></div>
             <input type="file" id="logoFile" accept="image/png,image/jpeg" class="sr-only"></section>
           <section class="card"><div class="card-title"><h3>Pejabat Penandatangan</h3></div>
             <div class="field"><label for="o_ketua">Ketua KKG</label><select class="select" id="o_ketua" name="ketua_id" ${dis}>${opsi(org.ketua_id)}</select></div>
@@ -459,6 +460,7 @@
     if (!bisaUbah) return;
 
     let logoUrl = org.logo_url;
+    if (bisaLogo) {
     $('#logoDz').onclick = () => $('#logoFile').click();
     $('#logoDz').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#logoFile').click(); } };
     $('#logoFile').onchange = async (e) => {
@@ -471,6 +473,7 @@
         logoUrl = up.url; toast('Logo terunggah. Klik Simpan untuk menerapkan.', 'success');
       } catch (err) { toast(err.message, 'error'); }
     };
+    }
     $('#orgReset').onclick = () => pengaturan();
     $('#orgForm').onsubmit = async (e) => {
       e.preventDefault();
@@ -489,8 +492,9 @@
         tentang: f.tentang.value.trim(), visi: f.visi.value.trim(), misi: f.misi.value.split('\n').map((s) => s.trim()).filter(Boolean),
         ketua_id: f.ketua_id.value || null, sekretaris_id: f.sekretaris_id.value || null, bendahara_id: f.bendahara_id.value || null,
         nominal_iuran: Number(f.nominal_iuran.value), tahun_anggaran: Number(f.tahun_anggaran.value), periode_pengurus: f.periode_pengurus.value.trim(),
-        format_nomor_surat: f.format_nomor_surat.value.trim(), logo_url: logoUrl || null
+        format_nomor_surat: f.format_nomor_surat.value.trim()
       };
+      if (bisaLogo) patch.logo_url = logoUrl || null;   // logo hanya oleh Admin IT
       try { await Data.updateOrg(patch); toast('Pengaturan organisasi tersimpan.', 'success'); }
       catch (err) { toast(err.message, 'error'); }
       finally { btn.disabled = false; }
@@ -696,12 +700,53 @@
   Router.add(/^\/berita\/([\w-]+)$/, (m) => P.beritaDetail(m));
   Router.add(/^\/dokumentasi\/([\w-]+)$/, (m) => P.albumPublik(m));
 
+  // ------------------------------------------------------------------
+  // WAJIB GANTI KATA SANDI (masuk pertama kali dengan sandi sementara)
+  // ------------------------------------------------------------------
+  function halamanWajibSandi() {
+    destroyCharts();
+    const p = Auth.profil;
+    $('#root').innerHTML = `<div class="container" style="max-width:520px;padding:40px 16px">
+      <div class="card"><div style="display:flex;gap:14px;align-items:center;margin-bottom:14px"><span class="icon-tile amber"><i class="bi bi-shield-lock"></i></span>
+        <div><h1 style="font-size:21px">Buat Kata Sandi Baru</h1><p class="muted body-sm">${esc(p.nama)} · ${esc(p.email)}</p></div></div>
+        <div class="alert info" style="margin-bottom:16px"><i class="bi bi-info-circle"></i><div>Anda masuk dengan <b>kata sandi sementara</b> dari email. Demi keamanan, buat kata sandi baru sebelum melanjutkan.</div></div>
+        <form id="wsForm" novalidate>
+          <div class="field"><label for="ws1">Kata sandi baru</label><div class="pass-wrap"><input class="input" id="ws1" name="baru" type="password" autocomplete="new-password">
+            <button type="button" class="btn btn-ghost btn-icon" id="wsLihat" aria-label="Tampilkan kata sandi"><i class="bi bi-eye"></i></button></div><div class="err"></div>
+            <span class="help">Minimal 8 karakter, memuat huruf dan angka. Jangan sama dengan kata sandi sementara.</span></div>
+          <div class="field"><label for="ws2">Ulangi kata sandi baru</label><input class="input" id="ws2" name="ulang" type="password" autocomplete="new-password"><div class="err"></div></div>
+          <button class="btn btn-primary btn-block" id="wsGo" style="min-height:48px"><i class="bi bi-check2-circle"></i> Simpan & Lanjutkan</button>
+          <button type="button" class="btn btn-ghost btn-block" id="wsKeluar" style="margin-top:8px"><i class="bi bi-box-arrow-right"></i> Keluar</button>
+        </form></div></div>`;
+    const ld = $('#loader'); if (ld) { ld.classList.add('done'); setTimeout(() => ld.remove(), 350); }
+    const f = $('#wsForm');
+    $('#wsLihat').onclick = () => { const t = f.baru.type === 'password' ? 'text' : 'password'; f.baru.type = t; f.ulang.type = t; };
+    $('#wsKeluar').onclick = async () => { await Auth.logout(); Router.go('/masuk'); };
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const ok = validasi(f, {
+        baru: (v) => v.length < 8 || !/[A-Za-z]/.test(v) || !/[0-9]/.test(v) ? 'Minimal 8 karakter, memuat huruf dan angka.' : '',
+        ulang: (v) => v !== f.baru.value ? 'Ulangi kata sandi yang sama.' : ''
+      });
+      if (!ok) return;
+      const btn = $('#wsGo'); btn.disabled = true;
+      try {
+        await Auth.gantiSandi(f.baru.value);
+        Auth.profil.wajib_ganti_sandi = false;
+        toast('Kata sandi baru tersimpan. Gunakan kata sandi ini saat masuk berikutnya.', 'success', 5000);
+        Router.go('/app/dashboard');
+      } catch (err) { toast(err.message, 'error', 6000); btn.disabled = false; }
+    };
+  }
+
+
   // Registri halaman: modul batch lain menambah lewat window.AppPages
   const HAL = window.AppPages = Object.assign(window.AppPages || {}, { dashboard, pengaturan, akun, notifikasi });
   // Perkakas bersama untuk modul halaman
   window.AppKit = { shell, chart, warna, destroyCharts, boleh, muatBadge, segera, ITEM };
   Router.add(/^\/app\/([\w-]+)$/, async ([id]) => {
     if (!Auth.profil) return Router.go('/masuk');
+    if (Auth.profil.wajib_ganti_sandi) return halamanWajibSandi();
     if (id !== 'profil' && !boleh(id)) { toast('Menu ini tidak tersedia untuk peran Anda.', 'warning'); return Router.go('/app/dashboard'); }
     return HAL[id] ? HAL[id](Router.query()) : segera(id);
   });
