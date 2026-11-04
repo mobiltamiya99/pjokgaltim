@@ -75,8 +75,16 @@
     ]
   };
 
+  // Contoh akun login username + kata sandi (guru tanpa Gmail)
+  db.pengguna.push({ id: 'u9', email: 'nurhidayat@akun.kkgpjok.id', nama: 'Nur Hidayat, S.Pd', role: 'anggota', status_aktif: true, terakhir_login: hari(-3), anggota_id: 'a7', metode_login: 'sandi', anggota: { sekolah: 'SD Negeri Slerok 1' } });
+
   // ---------------- Auth demo ----------------
   Auth.loginGoogle = async () => { throw new Error('Mode demo: pilih peran di bawah untuk mencoba.'); };
+  Auth.loginSandi = async () => { throw new Error('Mode demo: login sandi tidak tersedia. Pilih peran di bawah untuk mencoba.'); };
+  Auth.gantiSandi = async (baru) => {
+    if (String(baru).length < 8 || !/[A-Za-z]/.test(baru) || !/[0-9]/.test(baru)) throw new Error('Kata sandi minimal 8 karakter dan memuat huruf serta angka.');
+    return tunda(null, 400);
+  };
   Auth.init = async () => {
     try {
       const r = localStorage.getItem('kkg_demo_role');
@@ -136,10 +144,18 @@
       const dup = db.pengguna.find((p) => p.email === row.email.toLowerCase() && p.id !== row.id);
       if (dup) throw new Error('Data sudah ada (duplikat).');
       if (row.id) Object.assign(db.pengguna.find((p) => p.id === row.id), row, { email: row.email.toLowerCase() });
-      else db.pengguna.push(Object.assign({ id: 'u' + Date.now(), terakhir_login: null, anggota: null }, row, { email: row.email.toLowerCase() }));
+      else db.pengguna.push(Object.assign({ terakhir_login: null, anggota: null }, row, { id: 'u' + Date.now(), email: row.email.toLowerCase() }));
       return tunda(null);
     },
     setStatusPengguna: async (id, aktif) => { db.pengguna.find((p) => p.id === id).status_aktif = aktif; return tunda(null); },
+    aturSandi: async (email, sandi) => {
+      if (!Auth.profil || Auth.profil.role !== 'admin_it') throw new Error('Akses ditolak untuk peran ' + (Auth.profil || {}).role + '.');
+      if (String(sandi).length < 8 || !/[A-Za-z]/.test(sandi) || !/[0-9]/.test(sandi)) throw new Error('Kata sandi minimal 8 karakter dan memuat huruf serta angka.');
+      const u = db.pengguna.find((p) => p.email === String(email).toLowerCase());
+      if (!u) throw new Error('Simpan data akun terlebih dahulu sebelum mengatur kata sandi.');
+      const baru = !u._punyaSandi && u.id !== 'u9'; u._punyaSandi = true; u.metode_login = 'sandi';
+      return tunda({ success: true, message: baru ? 'Akun login bersandi dibuat (mode demo).' : 'Kata sandi diperbarui (mode demo).' }, 500);
+    },
 
     notifikasi: () => tunda(db.notif, 120),
     tandaiDibaca: async (id) => { db.notif.forEach((n) => { if (!id || n.id === id) n.dibaca = true; }); if (Auth.profil) Auth.profil.notif_belum_dibaca = db.notif.filter((n) => !n.dibaca).length; return tunda(null, 50); },
@@ -223,7 +239,7 @@
     async simpanAnggota(row) {
       perlu('sekretaris');
       if (row.nip && db.anggota.some((a) => a.nip === row.nip && a.id !== row.id)) throw new Error('Data sudah ada (duplikat): NIP sudah terdaftar.');
-      if (row.id) Object.assign(agtById(row.id), row); else db.anggota.push(Object.assign({ id: 'n' + Date.now(), tanggal_gabung: hari(0) }, row));
+      if (row.id) Object.assign(agtById(row.id), row); else db.anggota.push(Object.assign({ tanggal_gabung: hari(0) }, row, { id: 'n' + Date.now() }));
       return tunda(row);
     },
     async hapusAnggota(id) { perlu('sekretaris'); db.anggota = db.anggota.filter((a) => a.id !== id); return tunda(null); },
@@ -244,7 +260,7 @@
     async simpanPengurus(row) {
       perlu('sekretaris');
       const d = Object.assign({}, row, { periode_mulai: Number(row.periode_mulai), periode_selesai: Number(row.periode_selesai), urutan: Number(row.urutan || 10) });
-      if (row.id) Object.assign(db.pengurus.find((p) => p.id === row.id), d); else db.pengurus.push(Object.assign({ id: 'p' + Date.now() }, d));
+      if (row.id) Object.assign(db.pengurus.find((p) => p.id === row.id), d); else db.pengurus.push(Object.assign({}, d, { id: 'p' + Date.now() }));
       return tunda(null);
     },
     async hapusPengurus(id) { perlu('sekretaris'); db.pengurus = db.pengurus.filter((p) => p.id !== id); return tunda(null); },

@@ -237,24 +237,25 @@
     if (kelola) $('#pBaru').onclick = () => formPeserta(null);
 
     async function formPeserta(p) {
-      const [sekolah, guru] = await Promise.all([Data.sekolah().catch(() => []), Data.anggotaPilihan().catch(() => [])]);
+      const guru = await Data.anggotaPilihan().catch(() => []);
       modal({
         judul: p ? 'Ubah Peserta' : 'Tambah Peserta', wide: true,
         isi: `<form id="fP" novalidate><div class="field"><label for="p1">Lomba <span class="req">*</span></label><select class="select" id="p1" name="lomba_id"><option value="">— Pilih lomba —</option>${lomba.map((l) => `<option value="${esc(l.id)}" ${(p ? p.lomba_id : st.lomba) === l.id ? 'selected' : ''}>${esc(l.nama)} (${l.tanggal ? fmt.tglPendek(l.tanggal) : '-'})</option>`).join('')}</select><div class="err"></div></div>
           <div class="grid-2"><div class="field"><label for="p2">Nama Siswa <span class="req">*</span></label><input class="input" id="p2" name="nama_siswa" value="${esc(p ? p.nama_siswa : '')}"><div class="err"></div></div>
             <div class="field"><label for="p3">Kelas</label><select class="select" id="p3" name="kelas"><option value="">-</option>${['1', '2', '3', '4', '5', '6', '5–6'].map((k) => `<option ${p && p.kelas === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
-            <div class="field"><label for="p4">Sekolah <span class="req">*</span></label><select class="select" id="p4" name="sekolah"><option value="">— Pilih —</option>${sekolah.map((s) => `<option ${p && p.sekolah === s.nama ? 'selected' : ''}>${esc(s.nama)}</option>`).join('')}</select><div class="err"></div></div>
+            <div class="field"><label for="p4">Sekolah <span class="req">*</span></label>${UI.kolomSekolah({ id: 'p4', nilai: p ? p.sekolah : '' })}<div class="err"></div></div>
             <div class="field"><label for="p5">Cabang / Nomor</label><input class="input" id="p5" name="cabang" value="${esc(p ? p.cabang || '' : '')}"></div></div>
           <div class="field"><label for="p6">Guru Pendamping</label><select class="select" id="p6" name="guru_pendamping_id"><option value="">—</option>${guru.map((g) => `<option value="${esc(g.id)}" ${p && p.guru_pendamping_id === g.id ? 'selected' : ''}>${esc(g.nama)} — ${esc(g.sekolah || '')}</option>`).join('')}</select>
             <span class="help">Guru pendamping dapat mengajukan prestasi siswa ini dari akunnya.</span></div></form>`,
         foot: '<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="fPs"><i class="bi bi-save"></i> Simpan</button>',
         onOpen: (m, close) => {
           const fm = $('#fP', m);
+          UI.pasangSaranSekolah(fm.sekolah, guru.map((g) => g.sekolah));
           fm.guru_pendamping_id.onchange = () => { const g = guru.find((x) => x.id === fm.guru_pendamping_id.value); if (g && !fm.sekolah.value) fm.sekolah.value = g.sekolah; };
           $('#fPs', m).onclick = async () => {
-            if (!validasi(fm, { lomba_id: (v) => !v ? 'Pilih lomba.' : '', nama_siswa: (v) => v.length < 3 ? 'Isi nama siswa.' : '', sekolah: (v) => !v ? 'Pilih sekolah.' : '' })) return;
+            if (!validasi(fm, { lomba_id: (v) => !v ? 'Pilih lomba.' : '', nama_siswa: (v) => v.length < 3 ? 'Isi nama siswa.' : '', sekolah: (v) => UI.cekSekolah(v) })) return;
             try {
-              await Data.simpanPeserta({ id: p && p.id, lomba_id: fm.lomba_id.value, nama_siswa: fm.nama_siswa.value.trim(), kelas: fm.kelas.value, sekolah: fm.sekolah.value, cabang: fm.cabang.value.trim(), guru_pendamping_id: fm.guru_pendamping_id.value });
+              await Data.simpanPeserta({ id: p && p.id, lomba_id: fm.lomba_id.value, nama_siswa: fm.nama_siswa.value.trim(), kelas: fm.kelas.value, sekolah: UI.rapikanSekolah(fm.sekolah.value), cabang: fm.cabang.value.trim(), guru_pendamping_id: fm.guru_pendamping_id.value });
               close(); toast('Peserta disimpan.', 'success'); segar();
             } catch (e) { toast(e.message, 'error'); }
           };

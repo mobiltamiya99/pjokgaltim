@@ -963,3 +963,14 @@ a.news-card { display: flex; }
 @media (max-width: 640px) { .lap-prev { padding: 8px; } .lap-prev iframe { height: 70vh; } }
 .lap-pilih-hp { display: none; }
 @media (max-width: 900px) { .lap-list { display: none; } .lap-pilih-hp { display: block; } }
+
+/* ===== Login username & kata sandi ===== */
+.login-seg { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+.login-seg button { display: inline-flex; gap: 6px; align-items: center; justify-content: center; }
+.pass-wrap { position: relative; }
+.pass-wrap .input { padding-right: 52px; }
+.pass-wrap .btn-icon { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
+.sandi-box { font: 600 20px/1.3 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .04em; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px dashed var(--border); text-align: center; word-break: break-all; }
+
+/* Kolom sekolah: input ketik manual + saran (datalist) — sembunyikan panah agar tidak terlihat seperti pilihan wajib */
+input[list]::-webkit-calendar-picker-indicator { display: none !important; opacity: 0; }

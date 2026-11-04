@@ -247,6 +247,32 @@
     fr.contentDocument.open(); fr.contentDocument.write(html); fr.contentDocument.close();
     setTimeout(() => { fr.contentWindow.focus(); fr.contentWindow.print(); setTimeout(() => fr.remove(), 2000); }, 400);
   }
+  // ---- Kolom SEKOLAH: diketik manual + saran nama yang sudah pernah dipakai ----
+  function kolomSekolah({ id, nama = 'sekolah', nilai = '', placeholder = 'Ketik nama sekolah, contoh: SD Negeri Kejambon 2' } = {}) {
+    return `<input class="input" id="${id}" name="${nama}" list="${id}_dl" autocomplete="off" autocapitalize="words" maxlength="120" value="${esc(nilai || '')}" placeholder="${esc(placeholder)}"><datalist id="${id}_dl"></datalist>`;
+  }
+  const rapikanSekolah = (v) => String(v || '').replace(/\s+/g, ' ').trim();
+  async function pasangSaranSekolah(input, tambahan = []) {
+    if (!input) return;
+    const dl = document.getElementById(input.id + '_dl');
+    let list = [];
+    try { list = (await window.KKG.Data.sekolah()).map((s) => s.nama); } catch (e) { /* saran opsional */ }
+    const semua = [...new Set(list.concat(tambahan).map(rapikanSekolah).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
+    if (dl) dl.innerHTML = semua.map((n) => `<option value="${esc(n)}"></option>`).join('');
+    // samakan penulisan bila nama yang diketik sudah ada (beda huruf besar/kecil/spasi)
+    input.addEventListener('change', () => {
+      const v = rapikanSekolah(input.value);
+      const sama = semua.find((n) => n.toLowerCase() === v.toLowerCase());
+      input.value = sama || v;
+    });
+  }
+  function cekSekolah(v, wajib = true) {
+    const s = rapikanSekolah(v);
+    if (!s) return wajib ? 'Ketik nama sekolah.' : '';
+    if (s.length < 5) return 'Nama sekolah terlalu pendek.';
+    return '';
+  }
+
   // Badan tabel data laporan (dipakai cetak & Pusat Laporan)
   function tabelData(kolom, rows, total) {
     return `<table class="data"><thead><tr><th style="width:28px">No</th>${kolom.map((k) => `<th class="${k.num ? 'num' : ''}"${k.lebar ? ` style="width:${k.lebar}"` : ''}>${esc(k.label)}</th>`).join('')}</tr></thead>
@@ -288,5 +314,6 @@
     return out;
   }
 
-  window.UI = { tabel, saringLokal, drawer, lihatBerkas, eksporCSV, bacaCSV, cetak, cetakIsi, cetakDokumen, htmlDokumen, cetakHtml, tabelData, siapkanBerkas, penandatangan, badgeStatus };
+  window.UI = { tabel, saringLokal, drawer, lihatBerkas, eksporCSV, bacaCSV, cetak, cetakIsi, cetakDokumen, htmlDokumen, cetakHtml, tabelData, siapkanBerkas, penandatangan, badgeStatus,
+    kolomSekolah, pasangSaranSekolah, rapikanSekolah, cekSekolah };
 })();

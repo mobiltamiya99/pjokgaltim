@@ -501,21 +501,62 @@
   // AKUN PENGGUNA (Admin IT kelola; Ketua lihat)
   // ------------------------------------------------------------------
   async function akun() {
-    const el = await shell('akun', 'Akun Pengguna', 'Hak akses login Google per peran');
+    const el = await shell('akun', 'Akun Pengguna', 'Hak akses login per peran');
     const admin = Auth.profil.role === 'admin_it';
     const st = { cari: '', role: '', status: '', halaman: 1, per: 10, urut: 'nama', naik: true };
     el.innerHTML = `
-      <div class="page-head"><div><h1>Manajemen Akun Pengguna</h1><p>Hanya email Google yang terdaftar & aktif di sini yang dapat masuk ke sistem.</p></div>
+      <div class="page-head"><div><h1>Manajemen Akun Pengguna</h1><p>Hanya akun yang terdaftar & aktif di sini yang dapat masuk: lewat akun Google, atau username & kata sandi yang dibuat Admin IT.</p></div>
         ${admin ? '<div class="acts"><button class="btn btn-primary" id="uBaru"><i class="bi bi-person-plus"></i> Tambah Akun</button></div>' : '<span class="badge b-slate"><i class="bi bi-eye"></i> Mode lihat</span>'}</div>
       <div class="card" style="padding:16px 16px 0;margin-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0">
         <div class="toolbar"><div class="search"><i class="bi bi-search"></i><input class="input" id="uCari" placeholder="Cari nama atau email…" aria-label="Cari"></div>
           <select class="select" id="uRole" aria-label="Filter peran"><option value="">Semua peran</option>${Object.entries(ROLE_LABEL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
           <select class="select" id="uStatus" aria-label="Filter status"><option value="">Semua status</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select></div></div>
       <div class="card table-card" style="border-top-left-radius:0;border-top-right-radius:0"><div class="table-wrap"><table class="tbl stack">
-        <thead><tr><th class="sortable" data-sort="nama">Nama <i class="bi bi-arrow-down-up"></i></th><th class="sortable" data-sort="email">Email Google <i class="bi bi-arrow-down-up"></i></th>
+        <thead><tr><th class="sortable" data-sort="nama">Nama <i class="bi bi-arrow-down-up"></i></th><th class="sortable" data-sort="email">Login <i class="bi bi-arrow-down-up"></i></th>
           <th class="sortable" data-sort="role">Peran <i class="bi bi-arrow-down-up"></i></th><th>Status</th><th class="sortable" data-sort="terakhir_login">Login Terakhir <i class="bi bi-arrow-down-up"></i></th>${admin ? '<th class="col-aksi" style="text-align:right">Aksi</th>' : ''}</tr></thead>
         <tbody id="uBody"></tbody></table></div>
         <div class="tbl-foot"><span class="body-sm muted" id="uInfo"></span><div class="pager" id="uPager"></div></div></div>`;
+
+    const DOM = '@' + window.KKG.DOMAIN_USERNAME;
+    const isUsername = (e) => String(e || '').toLowerCase().endsWith(DOM);
+    const loginLabel = (u) => isUsername(u.email)
+      ? `<b class="tabnum">${esc(u.email.slice(0, -DOM.length))}</b><div><span class="badge b-amber" style="text-transform:none;letter-spacing:0"><i class="bi bi-key"></i> Username & sandi</span></div>`
+      : `${esc(u.email)}<div><span class="badge ${u.metode_login === 'sandi' ? 'b-amber' : 'b-navy'}" style="text-transform:none;letter-spacing:0"><i class="bi ${u.metode_login === 'sandi' ? 'bi-key' : 'bi-google'}"></i> ${u.metode_login === 'sandi' ? 'Email & sandi (juga Google)' : 'Google'}</span></div>`;
+    // Sandi acak mudah dibaca (tanpa huruf/angka yang mirip: 0/O, 1/l/I)
+    const sandiAcak = () => { const h = 'abcdefghjkmnpqrstuvwxyz', a = '23456789'; const r = (x) => x[Math.floor(Math.random() * x.length)];
+      const kata = Array.from({ length: 5 }, () => r(h)).join(''); return kata.charAt(0).toUpperCase() + kata.slice(1) + Array.from({ length: 3 }, () => r(a)).join(''); };
+    const sandiValid = (v) => v.length >= 8 && /[A-Za-z]/.test(v) && /[0-9]/.test(v);
+    const tampilkanSandi = (u, login, sandi, pesan) => modal({ judul: 'Simpan Informasi Login Ini',
+      isi: `<div class="alert success" style="margin-bottom:14px"><i class="bi bi-check-circle"></i><div>${esc(pesan)}</div></div>
+        <p>Berikan kepada <b>${esc(u.nama)}</b>:</p><dl class="kv" style="margin:12px 0"><dt>Alamat</dt><dd>${esc(location.origin + location.pathname)}</dd><dt>Pilih</dt><dd>Username & Sandi</dd><dt>Username</dt><dd><b>${esc(login)}</b></dd></dl>
+        <div class="label-sm muted" style="margin-bottom:6px">Kata sandi</div><div class="sandi-box" id="sbTeks">${esc(sandi)}</div>
+        <p class="help" style="margin-top:10px">Kata sandi ini tidak ditampilkan lagi. Minta pengguna menggantinya di <b>Profil Saya → Ganti Kata Sandi</b> setelah masuk pertama kali.</p>`,
+      foot: '<button class="btn btn-outline" id="sbSalin"><i class="bi bi-clipboard"></i> Salin</button><button class="btn btn-primary" data-close>Selesai</button>',
+      onOpen: (m) => { $('#sbSalin', m).onclick = async () => {
+        const teks = `Login KKG PJOK Tegal Timur\n${location.origin + location.pathname}\nPilih: Username & Sandi\nUsername: ${login}\nKata sandi: ${sandi}\n(Segera ganti kata sandi di Profil Saya)`;
+        try { await navigator.clipboard.writeText(teks); toast('Informasi login disalin. Kirim lewat pesan pribadi.', 'success'); } catch (e) { toast('Salin manual dari kotak di atas.', 'info'); } }; } });
+
+    async function formSandi(u) {
+      const login = isUsername(u.email) ? u.email.slice(0, -DOM.length) : u.email;
+      const awal = sandiAcak();
+      modal({ judul: u.metode_login === 'sandi' ? 'Reset Kata Sandi' : 'Buat Login Kata Sandi',
+        isi: `<p><b>${esc(u.nama)}</b> · ${esc(login)}</p>
+          <p class="help" style="margin:6px 0 14px">${u.metode_login === 'sandi' ? 'Kata sandi lama langsung tidak berlaku.' : 'Pengguna ini akan bisa masuk dengan email & kata sandi, selain dengan akun Google.'}</p>
+          <div class="field"><label for="fsBaru">Kata sandi baru</label><div class="pass-wrap"><input class="input tabnum" id="fsBaru" value="${awal}" autocomplete="new-password">
+            <button type="button" class="btn btn-ghost btn-icon" id="fsAcak" title="Buat sandi acak" aria-label="Buat sandi acak"><i class="bi bi-shuffle"></i></button></div>
+            <div class="err"></div><span class="help">Minimal 8 karakter, memuat huruf dan angka.</span></div>`,
+        foot: '<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="fsGo"><i class="bi bi-key"></i> Simpan Kata Sandi</button>',
+        onOpen: (m, close) => {
+          $('#fsAcak', m).onclick = () => { $('#fsBaru', m).value = sandiAcak(); };
+          $('#fsGo', m).onclick = async () => {
+            const v = $('#fsBaru', m).value.trim(); const fld = $('#fsBaru', m).closest('.field');
+            if (!sandiValid(v)) { fld.classList.add('invalid'); $('.err', fld).textContent = 'Minimal 8 karakter, memuat huruf dan angka.'; return; }
+            const btn = $('#fsGo', m); btn.disabled = true;
+            try { const r = await Data.aturSandi(u.email, v); close(); tampilkanSandi(u, login, v, (r && r.message) || 'Kata sandi disimpan.'); muat(); }
+            catch (e) { toast(e.message, 'error'); btn.disabled = false; }
+          };
+        } });
+    }
 
     const roleCls = { admin_it: 'b-slate', ketua: 'b-solid-navy', wakil_ketua: 'b-navy', sekretaris: 'b-teal', bendahara: 'b-amber', anggota: 'b-slate' };
     const muat = async () => {
@@ -524,12 +565,13 @@
         const { rows, total } = await Data.pengguna(st);
         $('#uBody').innerHTML = rows.length ? rows.map((u) => `<tr>
             <td data-label="Nama"><div style="display:flex;gap:10px;align-items:center">${avatar(u.nama)}<div><b>${esc(u.nama)}</b><div class="body-sm muted">${esc((u.anggota && u.anggota.sekolah) || '—')}</div></div></div></td>
-            <td data-label="Email">${esc(u.email)}</td>
+            <td data-label="Login">${loginLabel(u)}</td>
             <td data-label="Peran"><span class="badge ${roleCls[u.role]}">${ROLE_LABEL[u.role]}</span></td>
             <td data-label="Status">${u.status_aktif ? '<span class="badge b-green"><span class="dot"></span>Aktif</span>' : '<span class="badge b-slate">Nonaktif</span>'}</td>
             <td data-label="Login">${u.terakhir_login ? fmt.relatif(u.terakhir_login) : '<span class="muted">Belum pernah</span>'}</td>
             ${admin ? `<td class="no-label col-aksi"><div class="actions">
               <button class="btn btn-ghost btn-icon" data-edit="${esc(u.id)}" aria-label="Ubah ${esc(u.nama)}" title="Ubah"><i class="bi bi-pencil-square"></i></button>
+              <button class="btn btn-ghost btn-icon" data-sandi="${esc(u.id)}" aria-label="Atur kata sandi ${esc(u.nama)}" title="${u.metode_login === 'sandi' ? 'Reset kata sandi' : 'Buat login kata sandi'}"><i class="bi bi-key"></i></button>
               <button class="btn btn-ghost btn-icon" data-tog="${esc(u.id)}" data-aktif="${u.status_aktif}" aria-label="${u.status_aktif ? 'Nonaktifkan' : 'Aktifkan'}" title="${u.status_aktif ? 'Nonaktifkan' : 'Aktifkan'}">
                 <i class="bi ${u.status_aktif ? 'bi-person-x' : 'bi-person-check'}"></i></button></div></td>` : ''}</tr>`).join('')
           : `<tr><td colspan="6" class="no-label">${emptyState('Tidak ada akun', 'Ubah kata kunci atau filter pencarian.', 'bi-person-x')}</td></tr>`;
@@ -540,6 +582,7 @@
           + `<button ${st.halaman >= hal ? 'disabled' : ''} data-pg="${st.halaman + 1}" aria-label="Berikutnya"><i class="bi bi-chevron-right"></i></button>`;
         $$('#uPager [data-pg]').forEach((b) => b.onclick = () => { st.halaman = Number(b.dataset.pg); muat(); });
         $$('[data-edit]').forEach((b) => b.onclick = () => formAkun(rows.find((r) => r.id === b.dataset.edit)));
+        $$('[data-sandi]').forEach((b) => b.onclick = () => formSandi(rows.find((r) => r.id === b.dataset.sandi)));
         $$('[data-tog]').forEach((b) => b.onclick = async () => {
           const aktif = b.dataset.aktif === 'true';
           const u = rows.find((r) => r.id === b.dataset.tog);
@@ -563,21 +606,49 @@
         judul: u ? 'Ubah Akun Pengguna' : 'Tambah Akun Pengguna',
         isi: `<form id="aForm" novalidate>
           <div class="field"><label for="a_nama">Nama Lengkap <span class="req">*</span></label><input class="input" id="a_nama" name="nama" value="${esc(u ? u.nama : '')}"><div class="err"></div></div>
-          <div class="field"><label for="a_email">Email Google <span class="req">*</span></label><input class="input" id="a_email" name="email" type="email" value="${esc(u ? u.email : '')}" placeholder="nama@gmail.com"><div class="err"></div>
-            <span class="help">Pengguna login dengan akun Google beralamat email ini.</span></div>
+          <div class="field"><span class="label">Cara masuk <span class="req">*</span></span>
+            <div class="segmented" style="display:grid;grid-template-columns:1fr 1fr" role="tablist">
+              <button type="button" data-m="google" class="${!u || !isUsername(u.email) ? 'active' : ''}"><i class="bi bi-google"></i> Akun Google</button>
+              <button type="button" data-m="username" class="${u && isUsername(u.email) ? 'active' : ''}"><i class="bi bi-key"></i> Username & sandi</button></div></div>
+          <div class="field" id="a_emailF"><label for="a_email">Email Google <span class="req">*</span></label><input class="input" id="a_email" name="email" type="email" value="${esc(u && !isUsername(u.email) ? u.email : '')}" placeholder="nama@gmail.com"><div class="err"></div>
+            <span class="help">Pengguna masuk dengan akun Google beralamat email ini. Bisa juga diberi kata sandi lewat tombol kunci di daftar akun.</span></div>
+          <div class="field" id="a_userF" hidden><label for="a_user">Username <span class="req">*</span></label><input class="input" id="a_user" name="username" autocapitalize="none" spellcheck="false" value="${esc(u && isUsername(u.email) ? u.email.slice(0, -DOM.length) : '')}" placeholder="contoh: budi.santoso"><div class="err"></div>
+            <span class="help">Huruf kecil, angka, titik, garis bawah, atau tanda minus; 3–30 karakter. Untuk guru yang tidak memakai Gmail.</span></div>
+          ${u ? '' : `<div class="field" id="a_sandiF" hidden><label for="a_sandi">Kata sandi awal <span class="req">*</span></label><div class="pass-wrap"><input class="input tabnum" id="a_sandi" name="sandi" value="${sandiAcak()}" autocomplete="new-password">
+            <button type="button" class="btn btn-ghost btn-icon" id="a_acak" title="Buat sandi acak" aria-label="Buat sandi acak"><i class="bi bi-shuffle"></i></button></div><div class="err"></div><span class="help">Minimal 8 karakter, memuat huruf dan angka.</span></div>`}
           <div class="grid-2"><div class="field"><label for="a_role">Peran <span class="req">*</span></label><select class="select" id="a_role" name="role">${Object.entries(ROLE_LABEL).map(([k, v]) => `<option value="${k}" ${(u ? u.role : 'anggota') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
             <div class="field"><label for="a_agt">Tautkan ke Data Anggota</label><select class="select" id="a_agt" name="anggota_id"><option value="">— Tidak ditautkan —</option>${agt.map((a) => `<option value="${esc(a.id)}" ${u && u.anggota_id === a.id ? 'selected' : ''}>${esc(a.nama)}</option>`).join('')}</select></div></div>
           <label class="check"><input type="checkbox" name="status_aktif" ${!u || u.status_aktif ? 'checked' : ''}> <span>Akun aktif (dapat login)</span></label></form>`,
         foot: '<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="aSimpan"><i class="bi bi-save"></i> Simpan</button>',
         onOpen: (m, close) => {
+          let mode = u && isUsername(u.email) ? 'username' : 'google';
+          const setMode = (x) => { mode = x; $$('[data-m]', m).forEach((b) => b.classList.toggle('active', b.dataset.m === x));
+            $('#a_emailF', m).hidden = x !== 'google'; $('#a_userF', m).hidden = x !== 'username'; if ($('#a_sandiF', m)) $('#a_sandiF', m).hidden = x !== 'username'; };
+          $$('[data-m]', m).forEach((b) => b.onclick = () => setMode(b.dataset.m));
+          setMode(mode);
+          if ($('#a_acak', m)) $('#a_acak', m).onclick = () => { $('#a_sandi', m).value = sandiAcak(); };
           $('#aSimpan', m).onclick = async () => {
             const f = $('#aForm', m);
-            const ok = validasi(f, { nama: (v) => v.length < 3 ? 'Nama wajib diisi.' : '', email: (v) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? 'Format email tidak valid.' : '' });
-            if (!ok) return;
+            const aturan = { nama: (v) => v.length < 3 ? 'Nama wajib diisi.' : '' };
+            if (mode === 'google') aturan.email = (v) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? 'Format email tidak valid.' : '';
+            else {
+              aturan.username = (v) => !/^[a-z0-9._-]{3,30}$/.test(v.trim().toLowerCase()) ? 'Username 3–30 karakter: huruf kecil, angka, titik, _ atau -.' : '';
+              if (f.sandi) aturan.sandi = (v) => !sandiValid(v.trim()) ? 'Minimal 8 karakter, memuat huruf dan angka.' : '';
+            }
+            if (!validasi(f, aturan)) return;
+            const username = f.username.value.trim().toLowerCase();
+            const email = mode === 'google' ? f.email.value.trim().toLowerCase() : username + DOM;
             const btn = $('#aSimpan', m); btn.disabled = true;
             try {
-              await Data.simpanPengguna({ id: u && u.id, nama: f.nama.value.trim(), email: f.email.value.trim(), role: f.role.value, anggota_id: f.anggota_id.value || null, status_aktif: f.status_aktif.checked });
-              close(); toast(u ? 'Akun diperbarui.' : 'Akun ditambahkan. Pengguna kini dapat masuk dengan Google.', 'success'); muat();
+              const baris = { id: u && u.id, nama: f.nama.value.trim(), email, role: f.role.value, anggota_id: f.anggota_id.value || null, status_aktif: f.status_aktif.checked,
+                metode_login: mode === 'username' ? 'sandi' : (u ? u.metode_login : 'google') };
+              await Data.simpanPengguna(baris);
+              if (mode === 'username' && f.sandi) {
+                const sandi = f.sandi.value.trim();
+                try { const r = await Data.aturSandi(email, sandi); close(); tampilkanSandi(baris, username, sandi, (r && r.message) || 'Akun dibuat.'); }
+                catch (e) { close(); toast('Akun tersimpan, tetapi kata sandi gagal dibuat: ' + e.message + ' — coba lagi lewat tombol kunci.', 'error', 9000); }
+              } else { close(); toast(u ? 'Akun diperbarui.' : 'Akun ditambahkan. Pengguna kini dapat masuk dengan Google.', 'success'); }
+              muat();
             } catch (e) { toast(e.message, 'error'); btn.disabled = false; }
           };
         }

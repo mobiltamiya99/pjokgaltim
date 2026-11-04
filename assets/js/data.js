@@ -94,6 +94,7 @@
   // ---------------------------------------------------------------
   // AUTH
   // ---------------------------------------------------------------
+  const DOMAIN_USERNAME = 'akun.kkgpjok.id';
   const Auth = {
     profil: null,
     galat: null,
@@ -137,6 +138,31 @@
       if (error) throw new Error(error.message);
     },
 
+    // Username tanpa "@" diubah menjadi email buatan (akun dibuat Admin IT, tidak pernah dikirimi email)
+    keEmail(id) {
+      const v = String(id || '').trim().toLowerCase();
+      return v.includes('@') ? v : v + '@' + DOMAIN_USERNAME;
+    },
+    async loginSandi(id, sandi) {
+      if (!String(id || '').trim() || !sandi) throw new Error('Isi username/email dan kata sandi.');
+      const { error } = await sb.auth.signInWithPassword({ email: Auth.keEmail(id), password: sandi });
+      if (error) {
+        const m = error.message || '';
+        if (/invalid login credentials/i.test(m)) throw new Error('Username/email atau kata sandi salah.');
+        if (/email not confirmed/i.test(m)) throw new Error('Akun belum diaktifkan. Hubungi Admin IT.');
+        if (/rate limit|too many/i.test(m)) throw new Error('Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.');
+        throw new Error(m);
+      }
+      const p = await Auth.klaim();
+      if (!p) throw new Error(Auth.galat || 'Akun belum terdaftar di aplikasi. Hubungi Admin IT.');
+      return p;
+    },
+    async gantiSandi(baru) {
+      if (String(baru).length < 8 || !/[A-Za-z]/.test(baru) || !/[0-9]/.test(baru)) throw new Error('Kata sandi minimal 8 karakter dan memuat huruf serta angka.');
+      const { error } = await sb.auth.updateUser({ password: baru });
+      if (error) throw new Error(/same/i.test(error.message) ? 'Kata sandi baru harus berbeda dari yang lama.' : error.message);
+    },
+
     async logout() {
       Auth.profil = null;
       cache.clear('dash');
@@ -155,7 +181,7 @@
       return cache.set('org', await q(sb.from('pengaturan_organisasi').select('*').eq('id', 1).single()));
     },
     statPublik: () => q(sb.from('v_statistik_publik').select('*').single()),
-    sekolah: async () => cache.get('sekolah', 30 * 60 * 1000) ||
+    sekolah: async () => cache.get('sekolah', 5 * 60 * 1000) ||
       cache.set('sekolah', await q(sb.from('sekolah').select('nama,gugus,status').order('nama'))),
     kegiatanMendatang: (n = 3) => q(sb.from('kegiatan').select('id,judul,kategori,tanggal,jam_mulai,jam_selesai,lokasi,deskripsi,status')
       .eq('tampil_publik', true).gte('tanggal', new Date().toISOString().slice(0, 10)).order('tanggal').limit(n)),
@@ -177,7 +203,7 @@
       if (hit) return hit;
       return cache.set(k, await q(sb.rpc('dashboard_ringkasan', { p_tahun: tahun || null })));
     },
-    clearDashCache() { Object.keys(cache.mem).filter((k) => k.startsWith('dash_')).forEach(cache.clear); },
+    clearDashCache() { Object.keys(cache.mem).filter((k) => k.startsWith('dash_')).forEach(cache.clear); cache.clear('sekolah'); },
 
     async updateOrg(patch) {
       const r = await q(sb.from('pengaturan_organisasi').update(patch).eq('id', 1).select().single());
@@ -188,7 +214,7 @@
 
     // Akun pengguna (Admin IT)
     async pengguna({ cari = '', role = '', status = '', halaman = 1, per = 10, urut = 'nama', naik = true } = {}) {
-      let x = sb.from('pengguna').select('id,email,nama,role,status_aktif,terakhir_login,auth_id,anggota_id,anggota(sekolah,nip)', { count: 'exact' });
+      let x = sb.from('pengguna').select('id,email,nama,role,status_aktif,terakhir_login,auth_id,anggota_id,metode_login,anggota(sekolah,nip)', { count: 'exact' });
       cari = String(cari).replace(/[,()*%]/g, ' ').trim();   // cegah injeksi sintaks filter PostgREST
       if (cari) x = x.or(`nama.ilike.%${cari}%,email.ilike.%${cari}%`);
       if (role) x = x.eq('role', role);
@@ -198,8 +224,9 @@
       return { rows: r.data, total: r.count };
     },
     simpanPengguna: (row) => row.id
-      ? q(sb.from('pengguna').update({ nama: row.nama, email: row.email.toLowerCase(), role: row.role, status_aktif: row.status_aktif, anggota_id: row.anggota_id || null }).eq('id', row.id))
-      : q(sb.from('pengguna').insert({ nama: row.nama, email: row.email.toLowerCase(), role: row.role, status_aktif: row.status_aktif, anggota_id: row.anggota_id || null })),
+      ? q(sb.from('pengguna').update({ nama: row.nama, email: row.email.toLowerCase(), role: row.role, status_aktif: row.status_aktif, anggota_id: row.anggota_id || null, metode_login: row.metode_login || 'google' }).eq('id', row.id))
+      : q(sb.from('pengguna').insert({ nama: row.nama, email: row.email.toLowerCase(), role: row.role, status_aktif: row.status_aktif, anggota_id: row.anggota_id || null, metode_login: row.metode_login || 'google' })),
+    aturSandi: (email, sandi) => GAS.post('aturSandi', { email, sandi }),
     setStatusPengguna: (id, aktif) => q(sb.from('pengguna').update({ status_aktif: aktif }).eq('id', id)),
 
     // Notifikasi
@@ -224,7 +251,7 @@
     },
     async simpanAnggota(row) {
       const d = { nama: row.nama, nip: row.nip || null, nuptk: row.nuptk || null, email: row.email ? row.email.toLowerCase() : null,
-        sekolah: row.sekolah, status_kepegawaian: row.status_kepegawaian, no_hp: row.no_hp || null, kompetensi: row.kompetensi || null,
+        sekolah: String(row.sekolah || '').replace(/\s+/g, ' ').trim() || null, status_kepegawaian: row.status_kepegawaian, no_hp: row.no_hp || null, kompetensi: row.kompetensi || null,
         foto_url: row.foto_url || null, tampil_publik: !!row.tampil_publik, status_aktif: !!row.status_aktif };
       const r = row.id ? await q(sb.from('anggota').update(d).eq('id', row.id).select().single()) : await q(sb.from('anggota').insert(d).select().single());
       Data.clearDashCache(); return r;
@@ -468,5 +495,5 @@
     uploadPendaftaran: GAS.uploadPendaftaran
   };
 
-  window.KKG = { DEMO, PRODUKSI, BELUM_SIAP, galatKonfig, sb, Auth, Data, GAS, cache };
+  window.KKG = { DOMAIN_USERNAME, DEMO, PRODUKSI, BELUM_SIAP, galatKonfig, sb, Auth, Data, GAS, cache };
 })();

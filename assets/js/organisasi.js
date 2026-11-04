@@ -118,7 +118,6 @@
     }
 
     function formAnggota(a) {
-      const opsiSekolah = sekolah.map((s) => `<option ${a && a.sekolah === s.nama ? 'selected' : ''}>${esc(s.nama)}</option>`).join('');
       let foto = null;
       modal({
         judul: a ? 'Ubah Data Anggota' : 'Tambah Anggota', wide: true,
@@ -138,7 +137,7 @@
           <div class="grid-2">
             <div class="field"><label for="a4">Email Google</label><input class="input" id="a4" name="email" type="email" value="${esc(a ? a.email || '' : '')}"><div class="err"></div></div>
             <div class="field"><label for="a5">No. WhatsApp</label><input class="input" id="a5" name="no_hp" inputmode="tel" value="${esc(a ? a.no_hp || '' : '')}"><div class="err"></div></div>
-            <div class="field"><label for="a6">Sekolah Induk <span class="req">*</span></label><select class="select" id="a6" name="sekolah"><option value="">Pilih sekolah…</option>${opsiSekolah}</select><div class="err"></div></div>
+            <div class="field"><label for="a6">Sekolah Induk <span class="req">*</span></label>${UI.kolomSekolah({ id: 'a6', nilai: a ? a.sekolah : '' })}<div class="err"></div><span class="help">Ketik manual; saran muncul dari sekolah yang sudah terdaftar.</span></div>
             <div class="field"><label for="a7">Status Kepegawaian</label><select class="select" id="a7" name="status_kepegawaian">${KEPEG.map((k) => `<option ${a && a.status_kepegawaian === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
           </div>
           <div class="field"><label for="a8">Kompetensi / Cabang Olahraga</label><input class="input" id="a8" name="kompetensi" value="${esc(a ? a.kompetensi || '' : '')}" placeholder="Contoh: Atletik & Senam"></div>
@@ -151,6 +150,7 @@
         foot: '<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="fAsimpan"><i class="bi bi-save"></i> Simpan Data</button>',
         onOpen: (m, close) => {
           const f = $('#fA', m);
+          UI.pasangSaranSekolah(f.sekolah);
           f.nip.oninput = () => { f.nip.value = f.nip.value.replace(/\D/g, ''); };
           f.nuptk.oninput = () => { f.nuptk.value = f.nuptk.value.replace(/\D/g, ''); };
           $('#fAfoto', m).onchange = async (e) => {
@@ -162,7 +162,7 @@
               nip: (v) => v && !/^\d{8,20}$/.test(v) ? 'NIP berupa angka 8–20 digit.' : (!v && !f.nuptk.value.trim() ? 'Isi NIP atau NUPTK.' : ''),
               email: (v) => v && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? 'Format email tidak valid.' : '',
               no_hp: (v) => v && !/^[0-9+\-\s]{9,16}$/.test(v) ? 'Nomor tidak valid.' : '',
-              sekolah: (v) => !v ? 'Pilih sekolah.' : ''
+              sekolah: (v) => UI.cekSekolah(v)
             });
             if (!ok) return;
             const btn = $('#fAsimpan', m); btn.disabled = true;
@@ -170,7 +170,7 @@
               let foto_url = a ? a.foto_url : null;
               if (foto) foto_url = (await Data.upload('foto_profil', { base64: foto.base64, mime: foto.mime, nama: foto.nama, dataUrl: foto.dataUrl })).url;
               await Data.simpanAnggota({ id: a && a.id, nama: f.nama.value.trim(), nip: f.nip.value.trim(), nuptk: f.nuptk.value.trim(), email: f.email.value.trim(),
-                no_hp: f.no_hp.value.trim(), sekolah: f.sekolah.value, status_kepegawaian: f.status_kepegawaian.value, kompetensi: f.kompetensi.value.trim(),
+                no_hp: f.no_hp.value.trim(), sekolah: UI.rapikanSekolah(f.sekolah.value), status_kepegawaian: f.status_kepegawaian.value, kompetensi: f.kompetensi.value.trim(),
                 foto_url, status_aktif: f.status_aktif.checked, tampil_publik: f.tampil_publik.checked });
               close(); toast(a ? 'Data anggota diperbarui.' : 'Anggota baru ditambahkan.', 'success'); t.muat();
             } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
@@ -199,7 +199,6 @@
               if (!('nama' in data[0])) throw new Error('Kolom "nama" tidak ditemukan. Gunakan templat.');
               const ada = new Set((await Data.anggota({ semua: true })).rows.map((a) => a.nip).filter(Boolean));
               const dlmBerkas = new Set();
-              const sklSet = new Set(sekolah.map((s) => s.nama));
               const hasil = data.map((r) => {
                 const nip = String(r.nip || '').replace(/\D/g, '');
                 let st = 'OK';
@@ -210,9 +209,9 @@
                 else if (nip && ada.has(nip)) st = 'Duplikat (sudah ada)';
                 else if (nip && dlmBerkas.has(nip)) st = 'Duplikat (dalam berkas)';
                 if (nip) dlmBerkas.add(nip);
-                return { st, row: { nama: r.nama, nip: nip || null, nuptk: r.nuptk || null, email: r.email ? r.email.toLowerCase() : null, sekolah: r.sekolah || null,
+                return { st, row: { nama: r.nama, nip: nip || null, nuptk: r.nuptk || null, email: r.email ? r.email.toLowerCase() : null, sekolah: UI.rapikanSekolah(r.sekolah) || null,
                   status_kepegawaian: KEPEG.includes(r.status_kepegawaian) ? r.status_kepegawaian : 'PNS', no_hp: r.no_hp || null, kompetensi: r.kompetensi || null },
-                  catatan: r.sekolah && !sklSet.has(r.sekolah) ? 'Sekolah belum ada di master' : '' };
+                  catatan: '' };
               });
               valid = hasil.filter((h) => h.st === 'OK').map((h) => h.row);
               const dup = hasil.filter((h) => h.st.startsWith('Duplikat')).length;
@@ -606,6 +605,35 @@
   // ==================================================================
   // PROFIL SAYA
   // ==================================================================
+  // Kartu ganti kata sandi (semua pengguna; untuk akun Google ini menambah cara masuk dengan email & sandi)
+  function kartuSandi(wadah) {
+    const p = Auth.profil;
+    const username = /@akun\.kkgpjok\.id$/i.test(p.email);
+    const kartu = document.createElement('section');
+    kartu.className = 'card'; kartu.style.cssText = 'max-width:640px;margin-top:20px';
+    kartu.innerHTML = `<div class="card-title"><h3><i class="bi bi-key" style="color:var(--teal-text)"></i> Ganti Kata Sandi</h3></div>
+      <p class="body-sm muted" style="margin-bottom:14px">${username ? 'Anda masuk dengan username <b>' + esc(p.email.split('@')[0]) + '</b>. Ganti kata sandi pemberian Admin IT dengan sandi pribadi.'
+        : 'Akun Anda memakai Google. Mengisi kata sandi di sini menambah cara masuk dengan <b>email & kata sandi</b> (' + esc(p.email) + ').'}</p>
+      <form id="ksForm" novalidate><div class="grid-2">
+        <div class="field"><label for="ks1">Kata sandi baru</label><input class="input" id="ks1" name="baru" type="password" autocomplete="new-password"><div class="err"></div></div>
+        <div class="field"><label for="ks2">Ulangi kata sandi baru</label><input class="input" id="ks2" name="ulang" type="password" autocomplete="new-password"><div class="err"></div></div></div>
+        <label class="check" style="margin-bottom:12px"><input type="checkbox" id="ksLihat"> <span>Tampilkan kata sandi</span></label>
+        <div><button class="btn btn-primary" id="ksGo" type="submit"><i class="bi bi-save"></i> Simpan Kata Sandi</button></div>
+        <p class="help" style="margin-top:10px">Minimal 8 karakter, memuat huruf dan angka. Jangan memakai tanggal lahir atau NIP.</p></form>`;
+    wadah.appendChild(kartu);
+    $('#ksLihat', kartu).onchange = (e) => { $$('#ksForm input[type=password], #ksForm input[data-pw]', kartu).forEach((i) => { i.dataset.pw = 1; i.type = e.target.checked ? 'text' : 'password'; }); };
+    $('#ksForm', kartu).onsubmit = async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const ok = validasi(f, { baru: (v) => (v.length < 8 || !/[A-Za-z]/.test(v) || !/[0-9]/.test(v)) ? 'Minimal 8 karakter, memuat huruf dan angka.' : '',
+        ulang: (v) => v !== f.baru.value ? 'Kata sandi tidak sama.' : '' });
+      if (!ok) return;
+      const b = $('#ksGo', kartu); b.disabled = true;
+      try { await Auth.gantiSandi(f.baru.value); f.reset(); toast('Kata sandi berhasil diganti. Gunakan sandi baru saat masuk berikutnya.', 'success', 5000); }
+      catch (er) { toast(er.message, 'error'); } finally { b.disabled = false; }
+    };
+  }
+
   async function halProfil() {
     const el = await shell('profil', 'Profil Saya', 'Data pribadi & riwayat pengajuan');
     const p = Auth.profil;
@@ -614,6 +642,7 @@
       el.innerHTML = `<div class="page-head"><div><h1>Profil Saya</h1></div></div><div class="card" style="max-width:640px">
         <div style="display:flex;gap:16px;align-items:center">${avatar(p.nama, null, 'lg')}<div><h2 style="font-size:20px">${esc(p.nama)}</h2><p class="muted">${esc(p.email)}</p><span class="role-pill" style="margin-top:6px">${ROLE_LABEL[p.role]}</span></div></div>
         <div class="alert info" style="margin-top:20px"><i class="bi bi-link-45deg"></i><div>Akun ini belum ditautkan ke data anggota. Admin IT dapat menautkannya di menu <b>Akun Pengguna</b>.</div></div></div>`;
+      kartuSandi(el);
       return;
     }
     el.innerHTML = `<div class="page-head"><div><h1>Profil Saya</h1><p>Foto & nomor WhatsApp dapat diubah langsung. Perubahan nama, NIP, atau sekolah diajukan untuk disetujui pengurus.</p></div></div>
@@ -655,6 +684,7 @@
       try { await Data.updateProfilSaya({ no_hp: e.target.no_hp.value.trim() || null }); toast('Nomor WhatsApp disimpan.', 'success'); } catch (err) { toast(err.message, 'error'); }
     };
     $('#prAjukan').onclick = () => formAjukan(a);
+    kartuSandi(el);
 
     const riwayat = async () => {
       try {
@@ -669,7 +699,6 @@
     riwayat();
 
     async function formAjukan(a) {
-      const sekolah = await Data.sekolah().catch(() => []);
       let lamp = null;
       modal({
         judul: 'Ajukan Perubahan Data', wide: true,
@@ -677,7 +706,7 @@
           <form id="fJ" novalidate>
             <div class="field"><label for="j1">Nama & gelar baru</label><input class="input" id="j1" name="nama" placeholder="${esc(a.nama)}"><div class="err"></div></div>
             <div class="grid-2"><div class="field"><label for="j2">NIP baru</label><input class="input tabnum" id="j2" name="nip" inputmode="numeric" placeholder="${esc(a.nip || '')}"><div class="err"></div></div>
-              <div class="field"><label for="j3">Sekolah induk baru</label><select class="select" id="j3" name="sekolah"><option value="">— Tidak berubah —</option>${sekolah.filter((s) => s.nama !== a.sekolah).map((s) => `<option>${esc(s.nama)}</option>`).join('')}</select></div></div>
+              <div class="field"><label for="j3">Sekolah induk baru</label>${UI.kolomSekolah({ id: 'j3', placeholder: a.sekolah ? 'Saat ini: ' + a.sekolah : 'Ketik nama sekolah baru' })}<div class="err"></div><span class="help">Kosongkan bila tidak berubah.</span></div></div>
             <div class="field"><label for="j4">Alasan perubahan <span class="req">*</span></label><textarea class="textarea" id="j4" name="alasan" style="min-height:90px" placeholder="Contoh: Lulus S2 (M.Pd) pada Agustus 2026, ijazah terlampir."></textarea><div class="err"></div></div>
             <div class="field"><span class="label">Dokumen pendukung <span class="muted">(ijazah / SK mutasi — JPG, PNG, atau PDF)</span></span>
               <label class="dropzone" for="j5"><span class="preview" id="j5p"><i class="bi bi-paperclip"></i></span><span id="j5n"><b>Pilih berkas</b><br><span class="help">Gambar dikompres otomatis · PDF maks 5 MB</span></span></label>
@@ -686,6 +715,7 @@
         foot: '<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="fJs"><i class="bi bi-send"></i> Kirim Pengajuan</button>',
         onOpen: (m, close) => {
           const f = $('#fJ', m);
+          UI.pasangSaranSekolah(f.sekolah);
           f.nip.oninput = () => { f.nip.value = f.nip.value.replace(/\D/g, ''); };
           $('#j5', m).onchange = async (e) => {
             try { lamp = await siapkanBerkas(e.target.files[0]);
@@ -694,17 +724,18 @@
             catch (err) { lamp = null; toast(err.message, 'error'); }
           };
           $('#fJs', m).onclick = async () => {
-            const nama = f.nama.value.trim(), nip = f.nip.value.trim(), skl = f.sekolah.value;
+            const nama = f.nama.value.trim(), nip = f.nip.value.trim(), skl = UI.rapikanSekolah(f.sekolah.value);
             const ok = validasi(f, {
               nama: (v) => v && v.length < 3 ? 'Nama terlalu pendek.' : (!v && !nip && !skl ? 'Isi minimal satu data yang ingin diubah.' : ''),
               nip: (v) => v && !/^\d{8,20}$/.test(v) ? 'NIP berupa angka 8–20 digit.' : '',
+              sekolah: (v) => UI.cekSekolah(v, false),
               alasan: (v) => v.length < 10 ? 'Jelaskan alasan (min. 10 karakter).' : ''
             });
             if (!ok) return;
             const usul = {};
             if (nama && nama !== a.nama) usul.nama = nama;
             if (nip && nip !== a.nip) usul.nip = nip;
-            if (skl) usul.sekolah = skl;
+            if (skl && skl !== a.sekolah) usul.sekolah = skl;
             if (!Object.keys(usul).length) { toast('Data usulan sama dengan data saat ini.', 'warning'); return; }
             const btn = $('#fJs', m); btn.disabled = true;
             try {

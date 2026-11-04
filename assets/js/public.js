@@ -314,7 +314,8 @@
           </div>
           <div class="grid-2">
             <div class="field"><label for="sekolah">Sekolah Induk <span class="req">*</span></label>
-              <select class="select" id="sekolah" name="sekolah"><option value="">Memuat daftar sekolah…</option></select><div class="err"></div></div>
+              ${UI.kolomSekolah({ id: 'sekolah' })}<div class="err"></div>
+              <span class="help">Ketik lengkap nama sekolah tempat Anda bertugas. Pilih dari saran bila sudah muncul.</span></div>
             <div class="field"><label for="no_hp">No. WhatsApp <span class="muted">(opsional)</span></label>
               <input class="input" id="no_hp" name="no_hp" inputmode="tel" placeholder="0812-3456-7890"><div class="err"></div>
               <span class="help">Untuk pengingat & koordinasi gugus.</span></div>
@@ -331,9 +332,7 @@
 
     const form = $('#dfForm');
     let foto = null;
-    Data.sekolah().then((list) => {
-      form.sekolah.innerHTML = '<option value="">Pilih sekolah asal tugas…</option>' + list.map((s) => `<option>${esc(s.nama)}</option>`).join('');
-    }).catch(() => { form.sekolah.innerHTML = '<option value="">Gagal memuat — muat ulang halaman</option>'; });
+    UI.pasangSaranSekolah(form.sekolah);
 
     const pilihFoto = async (file) => {
       if (!file) return;
@@ -357,7 +356,7 @@
         nama: (v) => v.length < 3 ? 'Nama lengkap wajib diisi.' : '',
         nip: (v) => !/^\d{8,20}$/.test(v) ? 'NIP/NUPTK berupa angka 8–20 digit.' : '',
         email: (v) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? 'Format email tidak valid.' : '',
-        sekolah: (v) => !v ? 'Pilih sekolah induk.' : '',
+        sekolah: (v) => UI.cekSekolah(v),
         no_hp: (v) => v && !/^[0-9+\-\s]{9,16}$/.test(v) ? 'Nomor HP tidak valid.' : '',
         foto: () => !foto ? 'Foto profil wajib diunggah.' : '',
         setuju: (v) => !v ? 'Centang pernyataan untuk melanjutkan.' : ''
@@ -368,7 +367,7 @@
       try {
         const up = await Data.uploadPendaftaran({ base64: foto.base64, mime: foto.mime, nama: foto.nama, dataUrl: foto.dataUrl });
         await Data.daftar({ nama: form.nama.value.trim(), nip: form.nip.value.trim(), email: form.email.value.trim().toLowerCase(),
-          sekolah: form.sekolah.value, no_hp: form.no_hp.value.trim() || null, foto_url: up && up.url && !String(up.url).startsWith('data:') ? up.url : null });
+          sekolah: UI.rapikanSekolah(form.sekolah.value), no_hp: form.no_hp.value.trim() || null, foto_url: up && up.url && !String(up.url).startsWith('data:') ? up.url : null });
         $('#dfCard').innerHTML = `<div style="text-align:center;padding:24px 0" class="fade-in">
           <div class="ill" style="width:84px;height:84px;margin:0 auto 18px;border-radius:50%;display:grid;place-items:center;background:var(--b-green-bg);color:var(--b-green-tx);font-size:40px"><i class="bi bi-check-lg"></i></div>
           <h2 class="h-lg">Pendaftaran Terkirim</h2><p class="muted" style="margin-top:8px">Status Anda: <span class="badge b-amber">Menunggu Verifikasi</span></p>
@@ -397,15 +396,26 @@
         <div class="auth-side"><span class="hero-chip" style="align-self:flex-start"><i class="bi bi-shield-lock"></i> Portal Internal</span>
           <h1 class="h-xl">Sistem Administrasi Digital ${esc(org.singkatan)}</h1>
           <p>Kelola keanggotaan, agenda, persuratan, iuran, lomba, dan laporan organisasi dalam satu portal yang aman.</p>
-          <div style="display:grid;gap:12px;margin-top:8px">${[['bi-google', 'Login aman dengan akun Google'], ['bi-person-badge', 'Menu sesuai peran pengurus & anggota'], ['bi-shield-check', 'Data dilindungi hak akses berlapis']]
+          <div style="display:grid;gap:12px;margin-top:8px">${[['bi-google', 'Masuk dengan akun Google atau username & kata sandi'], ['bi-person-badge', 'Menu sesuai peran pengurus & anggota'], ['bi-shield-check', 'Data dilindungi hak akses berlapis']]
             .map(([i, t]) => `<div style="display:flex;gap:12px;align-items:center"><span class="icon-tile" style="background:rgba(255,255,255,.12);color:#fff"><i class="bi ${i}"></i></span>${t}</div>`).join('')}</div></div>
         <div class="auth-main"><div class="card auth-card fade-in">
           <div style="text-align:center"><span class="brand-logo" style="margin:0 auto 14px;width:56px;height:56px;font-size:26px"><i class="bi bi-trophy"></i></span>
-            <h2 class="h-md">Masuk ke Sistem KKG</h2><p class="muted body-sm" style="margin-top:6px">Gunakan akun Google yang sudah terdaftar dan diaktifkan Admin IT.</p></div>
-          ${Auth.galat ? `<div class="alert error" style="margin-top:20px"><i class="bi bi-exclamation-octagon"></i><div>${esc(Auth.galat)}</div></div>` : ''}
-          <button class="btn btn-google btn-block" id="gBtn" style="margin-top:24px">
+            <h2 class="h-md">Masuk ke Sistem KKG</h2><p class="muted body-sm" style="margin-top:6px">Gunakan akun yang sudah terdaftar dan diaktifkan Admin IT.</p></div>
+          ${Auth.galat ? `<div class="alert error" style="margin-top:20px" id="lGalat"><i class="bi bi-exclamation-octagon"></i><div>${esc(Auth.galat)}</div></div>` : '<div id="lGalat" hidden></div>'}
+          <div class="segmented login-seg" role="tablist" aria-label="Cara masuk" style="margin-top:22px">
+            <button type="button" role="tab" class="active" aria-selected="true" data-cara="google"><i class="bi bi-google"></i> Akun Google</button>
+            <button type="button" role="tab" aria-selected="false" data-cara="sandi"><i class="bi bi-key"></i> Username & Sandi</button></div>
+          <div data-panel="google">
+          <button class="btn btn-google btn-block" id="gBtn" style="margin-top:18px">
             <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
             Masuk dengan Google</button>
+          <p class="help" style="text-align:center;margin-top:10px">Untuk pengguna yang didaftarkan dengan email Gmail.</p></div>
+          <form data-panel="sandi" hidden id="sForm" novalidate style="margin-top:18px">
+            <div class="field"><label for="sUser">Username atau email</label><input class="input" id="sUser" name="user" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="contoh: budi.santoso"><div class="err"></div></div>
+            <div class="field"><label for="sPass">Kata sandi</label><div class="pass-wrap"><input class="input" id="sPass" name="pass" type="password" autocomplete="current-password">
+              <button type="button" class="btn btn-ghost btn-icon" id="sLihat" aria-label="Tampilkan kata sandi"><i class="bi bi-eye"></i></button></div><div class="err"></div></div>
+            <button class="btn btn-primary btn-block" id="sBtn" type="submit"><i class="bi bi-box-arrow-in-right"></i> Masuk</button>
+            <p class="help" style="text-align:center;margin-top:10px">Username & kata sandi diberikan Admin IT. Lupa kata sandi? Hubungi Admin IT untuk direset.</p></form>
           ${DEMO ? `<div class="alert warning" style="margin-top:20px"><i class="bi bi-cone-striped"></i><div><b>Mode demo</b> — Supabase belum dikonfigurasi. Pilih peran untuk mencoba tampilan:</div></div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px" id="demoRoles">
             ${Object.entries(window.K.ROLE_LABEL).map(([k, v]) => `<button class="btn btn-outline btn-sm" data-role="${k}">${v}</button>`).join('')}</div>` : ''}
@@ -420,6 +430,33 @@
       try { await Auth.loginGoogle(); } catch (e) { toast(e.message, 'error'); $('#gBtn').disabled = false; }
     };
     $$('#demoRoles [data-role]').forEach((b) => b.onclick = () => { Auth.masukDemo(b.dataset.role); Router.go('/app/dashboard'); });
+    // Pilihan cara masuk (diingat di perangkat ini)
+    const pilih = (cara) => {
+      $$('[data-cara]').forEach((b) => { const on = b.dataset.cara === cara; b.classList.toggle('active', on); b.setAttribute('aria-selected', on); });
+      $$('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== cara; });
+      try { localStorage.setItem('kkg_cara_masuk', cara); } catch (e) { /* abaikan */ }
+      if (cara === 'sandi') setTimeout(() => $('#sUser').focus(), 50);
+    };
+    $$('[data-cara]').forEach((b) => b.onclick = () => pilih(b.dataset.cara));
+    try { if (localStorage.getItem('kkg_cara_masuk') === 'sandi') pilih('sandi'); } catch (e) { /* abaikan */ }
+    $('#sLihat').onclick = () => { const i = $('#sPass'); const lihat = i.type === 'password'; i.type = lihat ? 'text' : 'password';
+      $('#sLihat').innerHTML = `<i class="bi ${lihat ? 'bi-eye-slash' : 'bi-eye'}"></i>`; $('#sLihat').setAttribute('aria-label', lihat ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'); };
+    $('#sForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const f = $('#sForm');
+      if (!validasi(f, { user: (v) => v.trim().length < 3 ? 'Isi username atau email.' : '', pass: (v) => !v ? 'Isi kata sandi.' : '' })) return;
+      const btn = $('#sBtn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Memeriksa…';
+      try {
+        await Auth.loginSandi(f.user.value, f.pass.value);
+        toast('Selamat datang, ' + Auth.profil.nama + '.', 'success');
+        Router.go('/app/dashboard');
+      } catch (er) {
+        const g = $('#lGalat'); g.hidden = false; g.className = 'alert error'; g.style.marginTop = '20px';
+        g.innerHTML = `<i class="bi bi-exclamation-octagon"></i><div>${esc(er.message)}</div>`;
+        f.pass.value = ''; f.pass.focus();
+        btn.disabled = false; btn.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Masuk';
+      }
+    };
   }
 
   window.PublicPages = { beranda, profil, kontak, daftar, masuk, segera, _shell: shell, _gagal: gagal };
