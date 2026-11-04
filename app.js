@@ -32,7 +32,7 @@
       { id: 'kas', label: 'Buku Kas', icon: 'bi-cash-stack', peran: ['ketua', 'bendahara', 'wakil_ketua'], batch: 4 },
       { id: 'iuran', label: 'Iuran Anggota', icon: 'bi-wallet2', peran: ['ketua', 'bendahara', 'wakil_ketua'], batch: 4 },
       { id: 'tunggakan', label: 'Tunggakan', icon: 'bi-exclamation-diamond', peran: ['ketua', 'bendahara'], badge: 'tunggakan', batch: 4 },
-      { id: 'iuran-saya', label: 'Iuran Saya', icon: 'bi-receipt', peran: ['anggota'], batch: 4 }] },
+      { id: 'iuran-saya', label: 'Iuran Saya', icon: 'bi-receipt', peran: SEMUA, batch: 4 }] },
     { grup: 'Lomba & Prestasi', items: [
       { id: 'lomba', label: 'Jadwal Lomba', icon: 'bi-flag', peran: SEMUA, batch: 5 },
       { id: 'peserta', label: 'Peserta Lomba', icon: 'bi-person-badge', peran: SEMUA, batch: 5 },
@@ -248,6 +248,7 @@
           <select class="select" id="dTahun" style="width:auto" aria-label="Tahun">${[th, th - 1, th - 2].map((y) => `<option>${y}</option>`).join('')}</select>
           <button class="btn btn-outline" id="dRefresh"><i class="bi bi-arrow-clockwise"></i> Muat ulang</button></div>
       </div>
+      <div id="iuranBanner"></div>
       <div class="kpi-grid" id="kpi">${Array.from({ length: 4 }, () => '<div class="skel" style="height:150px;border-radius:16px"></div>').join('')}</div>
       <div class="dash-grid" id="dGrid">${Array.from({ length: 4 }, () => '<div class="card span-6"><div class="skel skel-line" style="width:40%"></div><div class="skel" style="height:220px;margin-top:14px"></div></div>').join('')}</div>`;
     const muat = async (paksa) => {
@@ -314,6 +315,17 @@
       })()
     };
     $('#kpi').innerHTML = (set[role] ? set[role]() : []).join('');
+
+    // ---- Pengingat iuran pribadi (semua peran yang tertaut ke Data Anggota) ----
+    const bIuran = $('#iuranBanner');
+    if (bIuran) {
+      const is = d.iuran_saya;
+      const tunggak = is && Number(d.tahun) === new Date().getFullYear() ? Math.max(0, bulanIni + 1 - is.lunas.length - is.menunggu.length) : 0;
+      bIuran.innerHTML = tunggak ? `<div class="alert warning" style="margin-bottom:16px;align-items:center"><i class="bi bi-bell"></i>
+          <div style="flex:1"><b>Pengingat iuran bulanan:</b> ${tunggak} bulan iuran Anda belum dibayar (${fmt.rp(is.nominal)}/bulan, total ${fmt.rp(tunggak * Number(is.nominal || 0))}).
+          Bayar tunai ke Bendahara atau transfer lalu kirim bukti.</div>
+          <a class="btn btn-sm btn-primary" href="#/app/iuran-saya"><i class="bi bi-receipt"></i> Bayar / Kirim Bukti</a></div>` : '';
+    }
 
     // ---- Kartu grafik (hanya yang tersedia untuk peran ini) ----
     const kartu = [];
@@ -402,18 +414,19 @@
   }
 
   // ------------------------------------------------------------------
-  // PENGATURAN ORGANISASI (Admin IT ubah; Ketua & Sekretaris lihat)
+  // PENGATURAN ORGANISASI (Admin IT & Sekretaris ubah — logo hanya Admin IT; Ketua lihat)
   // ------------------------------------------------------------------
   async function pengaturan() {
     const el = await shell('pengaturan', 'Pengaturan Organisasi', 'Identitas, penandatangan, iuran, penomoran surat');
-    const bisaUbah = Auth.profil.role === 'admin_it';
+    const bisaUbah = ['admin_it', 'sekretaris'].includes(Auth.profil.role);
+    const bisaLogo = Auth.profil.role === 'admin_it';
     el.innerHTML = '<div class="skel skel-block" style="height:400px"></div>';
     const [org, anggota] = await Promise.all([Data.org(true), Data.anggotaPilihan().catch(() => [])]);
     const opsi = (sel) => `<option value="">— Pilih anggota —</option>` + anggota.map((a) => `<option value="${esc(a.id)}" ${a.id === sel ? 'selected' : ''}>${esc(a.nama)}</option>`).join('');
     const dis = bisaUbah ? '' : 'disabled';
     el.innerHTML = `
       <div class="page-head"><div><h1>Pengaturan Organisasi</h1><p>Data ini dipakai di website publik, kop laporan, dan penomoran surat.</p></div>
-        ${bisaUbah ? '' : '<span class="badge b-slate"><i class="bi bi-lock"></i> Hanya Admin IT yang dapat mengubah</span>'}</div>
+        ${bisaUbah ? (bisaLogo ? '' : '<span class="badge b-slate"><i class="bi bi-lock"></i> Logo hanya dapat diubah Admin IT</span>') : '<span class="badge b-slate"><i class="bi bi-lock"></i> Hanya Admin IT & Sekretaris yang dapat mengubah</span>'}</div>
       <form id="orgForm" novalidate>
       <div class="dash-grid">
         <section class="card span-8"><div class="card-title"><h3><i class="bi bi-building" style="color:var(--teal)"></i> Identitas Organisasi</h3></div>
@@ -432,8 +445,8 @@
         </section>
         <div class="span-4" style="display:flex;flex-direction:column;gap:20px">
           <section class="card"><div class="card-title"><h3>Logo Organisasi</h3></div>
-            <div class="dropzone" id="logoDz" ${bisaUbah ? 'tabindex="0" role="button"' : ''}><span class="preview" id="logoPrev">${org.logo_url ? `<img src="${esc(org.logo_url)}" alt="Logo">` : '<i class="bi bi-image"></i>'}</span>
-              <span class="body-sm">${bisaUbah ? '<b>Ganti logo</b><br><span class="help">PNG/JPG persegi, dikompres otomatis.</span>' : 'Logo hanya dapat diubah Admin IT.'}</span></div>
+            <div class="dropzone" id="logoDz" ${bisaLogo ? 'tabindex="0" role="button"' : ''}><span class="preview" id="logoPrev">${org.logo_url ? `<img src="${esc(org.logo_url)}" alt="Logo">` : '<i class="bi bi-image"></i>'}</span>
+              <span class="body-sm">${bisaLogo ? '<b>Ganti logo</b><br><span class="help">PNG/JPG persegi, dikompres otomatis.</span>' : 'Logo hanya dapat diubah Admin IT.'}</span></div>
             <input type="file" id="logoFile" accept="image/png,image/jpeg" class="sr-only"></section>
           <section class="card"><div class="card-title"><h3>Pejabat Penandatangan</h3></div>
             <div class="field"><label for="o_ketua">Ketua KKG</label><select class="select" id="o_ketua" name="ketua_id" ${dis}>${opsi(org.ketua_id)}</select></div>
@@ -459,6 +472,7 @@
     if (!bisaUbah) return;
 
     let logoUrl = org.logo_url;
+    if (bisaLogo) {
     $('#logoDz').onclick = () => $('#logoFile').click();
     $('#logoDz').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#logoFile').click(); } };
     $('#logoFile').onchange = async (e) => {
@@ -471,6 +485,7 @@
         logoUrl = up.url; toast('Logo terunggah. Klik Simpan untuk menerapkan.', 'success');
       } catch (err) { toast(err.message, 'error'); }
     };
+    }
     $('#orgReset').onclick = () => pengaturan();
     $('#orgForm').onsubmit = async (e) => {
       e.preventDefault();
@@ -489,8 +504,9 @@
         tentang: f.tentang.value.trim(), visi: f.visi.value.trim(), misi: f.misi.value.split('\n').map((s) => s.trim()).filter(Boolean),
         ketua_id: f.ketua_id.value || null, sekretaris_id: f.sekretaris_id.value || null, bendahara_id: f.bendahara_id.value || null,
         nominal_iuran: Number(f.nominal_iuran.value), tahun_anggaran: Number(f.tahun_anggaran.value), periode_pengurus: f.periode_pengurus.value.trim(),
-        format_nomor_surat: f.format_nomor_surat.value.trim(), logo_url: logoUrl || null
+        format_nomor_surat: f.format_nomor_surat.value.trim()
       };
+      if (bisaLogo) patch.logo_url = logoUrl || null;   // logo hanya oleh Admin IT
       try { await Data.updateOrg(patch); toast('Pengaturan organisasi tersimpan.', 'success'); }
       catch (err) { toast(err.message, 'error'); }
       finally { btn.disabled = false; }
@@ -510,7 +526,7 @@
       <div class="card" style="padding:16px 16px 0;margin-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0">
         <div class="toolbar"><div class="search"><i class="bi bi-search"></i><input class="input" id="uCari" placeholder="Cari nama atau email…" aria-label="Cari"></div>
           <select class="select" id="uRole" aria-label="Filter peran"><option value="">Semua peran</option>${Object.entries(ROLE_LABEL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
-          <select class="select" id="uStatus" aria-label="Filter status"><option value="">Semua status</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select></div></div>
+          <select class="select" id="uStatus" aria-label="Filter status"><option value="">Semua status</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option><option value="arsip">Diarsipkan</option></select></div></div>
       <div class="card table-card" style="border-top-left-radius:0;border-top-right-radius:0"><div class="table-wrap"><table class="tbl stack">
         <thead><tr><th class="sortable" data-sort="nama">Nama <i class="bi bi-arrow-down-up"></i></th><th class="sortable" data-sort="email">Login <i class="bi bi-arrow-down-up"></i></th>
           <th class="sortable" data-sort="role">Peran <i class="bi bi-arrow-down-up"></i></th><th>Status</th><th class="sortable" data-sort="terakhir_login">Login Terakhir <i class="bi bi-arrow-down-up"></i></th>${admin ? '<th class="col-aksi" style="text-align:right">Aksi</th>' : ''}</tr></thead>
@@ -567,13 +583,15 @@
             <td data-label="Nama"><div style="display:flex;gap:10px;align-items:center">${avatar(u.nama)}<div><b>${esc(u.nama)}</b><div class="body-sm muted">${esc((u.anggota && u.anggota.sekolah) || '—')}</div></div></div></td>
             <td data-label="Login">${loginLabel(u)}</td>
             <td data-label="Peran"><span class="badge ${roleCls[u.role]}">${ROLE_LABEL[u.role]}</span></td>
-            <td data-label="Status">${u.status_aktif ? '<span class="badge b-green"><span class="dot"></span>Aktif</span>' : '<span class="badge b-slate">Nonaktif</span>'}</td>
+            <td data-label="Status">${u.status_aktif ? '<span class="badge b-green"><span class="dot"></span>Aktif</span>' : u.diarsipkan_pada ? '<span class="badge b-navy"><i class="bi bi-archive"></i> Diarsipkan</span>' : '<span class="badge b-slate">Nonaktif</span>'}</td>
             <td data-label="Login">${u.terakhir_login ? fmt.relatif(u.terakhir_login) : '<span class="muted">Belum pernah</span>'}</td>
             ${admin ? `<td class="no-label col-aksi"><div class="actions">
               <button class="btn btn-ghost btn-icon" data-edit="${esc(u.id)}" aria-label="Ubah ${esc(u.nama)}" title="Ubah"><i class="bi bi-pencil-square"></i></button>
               <button class="btn btn-ghost btn-icon" data-sandi="${esc(u.id)}" aria-label="Atur kata sandi ${esc(u.nama)}" title="${u.metode_login === 'sandi' ? 'Reset kata sandi' : 'Buat login kata sandi'}"><i class="bi bi-key"></i></button>
-              <button class="btn btn-ghost btn-icon" data-tog="${esc(u.id)}" data-aktif="${u.status_aktif}" aria-label="${u.status_aktif ? 'Nonaktifkan' : 'Aktifkan'}" title="${u.status_aktif ? 'Nonaktifkan' : 'Aktifkan'}">
-                <i class="bi ${u.status_aktif ? 'bi-person-x' : 'bi-person-check'}"></i></button></div></td>` : ''}</tr>`).join('')
+              <button class="btn btn-ghost btn-icon" data-tog="${esc(u.id)}" data-aktif="${u.status_aktif}" aria-label="${u.status_aktif ? 'Nonaktifkan' : 'Aktifkan kembali'}" title="${u.status_aktif ? 'Nonaktifkan' : 'Aktifkan kembali'}">
+                <i class="bi ${u.status_aktif ? 'bi-person-x' : 'bi-person-check'}"></i></button>
+              ${u.status_aktif ? '' : `<button class="btn btn-ghost btn-icon" data-arsip="${esc(u.id)}" aria-label="${u.diarsipkan_pada ? 'Keluarkan dari arsip' : 'Arsipkan'}" title="${u.diarsipkan_pada ? 'Keluarkan dari arsip' : 'Arsipkan'}"><i class="bi ${u.diarsipkan_pada ? 'bi-box-arrow-up' : 'bi-archive'}"></i></button>
+              <button class="btn btn-ghost btn-icon" data-hapus="${esc(u.id)}" aria-label="Hapus permanen" title="Hapus permanen" style="color:var(--danger)"><i class="bi bi-trash3"></i></button>`}</div></td>` : ''}</tr>`).join('')
           : `<tr><td colspan="6" class="no-label">${emptyState('Tidak ada akun', 'Ubah kata kunci atau filter pencarian.', 'bi-person-x')}</td></tr>`;
         const hal = Math.max(1, Math.ceil(total / st.per));
         $('#uInfo').textContent = total ? `Menampilkan ${(st.halaman - 1) * st.per + 1}–${Math.min(st.halaman * st.per, total)} dari ${total} akun` : '';
@@ -590,6 +608,22 @@
           const r = await konfirmasi({ judul: aktif ? 'Nonaktifkan akun?' : 'Aktifkan akun?', pesan: `<b>${esc(u.nama)}</b> ${aktif ? 'tidak akan bisa masuk lagi. Riwayat data tetap tersimpan.' : 'akan dapat masuk kembali.'}`, ok: aktif ? 'Nonaktifkan' : 'Aktifkan', bahaya: aktif });
           if (!r.ok) return;
           try { await Data.setStatusPengguna(u.id, !aktif); toast(`Akun ${u.nama} ${aktif ? 'dinonaktifkan' : 'diaktifkan'}.`, 'success'); muat(); } catch (e) { toast(e.message, 'error'); }
+        });
+        $$('[data-arsip]').forEach((b) => b.onclick = async () => {
+          const u = rows.find((r) => r.id === b.dataset.arsip);
+          const keArsip = !u.diarsipkan_pada;
+          const r = await konfirmasi({ judul: keArsip ? 'Arsipkan akun?' : 'Keluarkan dari arsip?', ok: keArsip ? 'Arsipkan' : 'Keluarkan',
+            pesan: keArsip ? `<b>${esc(u.nama)}</b> dipindah ke arsip: tidak tampil di daftar utama dan tetap tidak bisa masuk. Data & riwayatnya tersimpan; bisa dipulihkan kapan saja lewat filter <b>Diarsipkan</b>.`
+              : `<b>${esc(u.nama)}</b> kembali ke daftar utama sebagai akun <b>nonaktif</b>.` });
+          if (!r.ok) return;
+          try { await Data.arsipkanPengguna(u.id, keArsip); toast(`Akun ${u.nama} ${keArsip ? 'diarsipkan' : 'dikeluarkan dari arsip'}.`, 'success'); muat(); } catch (e) { toast(e.message, 'error'); }
+        });
+        $$('[data-hapus]').forEach((b) => b.onclick = async () => {
+          const u = rows.find((r) => r.id === b.dataset.hapus);
+          const r = await konfirmasi({ judul: 'Hapus akun permanen?', bahaya: true, ok: 'Hapus permanen',
+            pesan: `Akun login <b>${esc(u.nama)}</b> (${esc(u.email)}) dihapus permanen beserta notifikasi & riwayat pengajuannya, dan <b>tidak dapat dikembalikan</b>.<br><br>Data di menu <b>Data Anggota</b> tetap tersimpan (hapus terpisah oleh Sekretaris bila perlu). Jika hanya ingin menyimpan, pilih <b>Arsipkan</b>.` });
+          if (!r.ok) return;
+          try { await Data.hapusPengguna(u.id); toast(`Akun ${u.nama} dihapus permanen.`, 'success'); muat(); } catch (e) { toast(e.message, 'error'); }
         });
       } catch (e) { $('#uBody').innerHTML = `<tr><td colspan="6"><div class="alert error"><i class="bi bi-x-circle"></i>${esc(e.message)}</div></td></tr>`; }
     };
@@ -617,7 +651,10 @@
           ${u ? '' : `<div class="field" id="a_sandiF" hidden><label for="a_sandi">Kata sandi awal <span class="req">*</span></label><div class="pass-wrap"><input class="input tabnum" id="a_sandi" name="sandi" value="${sandiAcak()}" autocomplete="new-password">
             <button type="button" class="btn btn-ghost btn-icon" id="a_acak" title="Buat sandi acak" aria-label="Buat sandi acak"><i class="bi bi-shuffle"></i></button></div><div class="err"></div><span class="help">Minimal 8 karakter, memuat huruf dan angka.</span></div>`}
           <div class="grid-2"><div class="field"><label for="a_role">Peran <span class="req">*</span></label><select class="select" id="a_role" name="role">${Object.entries(ROLE_LABEL).map(([k, v]) => `<option value="${k}" ${(u ? u.role : 'anggota') === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-            <div class="field"><label for="a_agt">Tautkan ke Data Anggota</label><select class="select" id="a_agt" name="anggota_id"><option value="">— Tidak ditautkan —</option>${agt.map((a) => `<option value="${esc(a.id)}" ${u && u.anggota_id === a.id ? 'selected' : ''}>${esc(a.nama)}</option>`).join('')}</select></div></div>
+            <div class="field"><label for="a_agt">Tautkan ke Data Anggota</label><select class="select" id="a_agt" name="anggota_id"><option value="">${u ? '— Tidak ditautkan —' : '＋ Buat otomatis di Data Anggota'}</option>${agt.map((a) => `<option value="${esc(a.id)}" ${u && u.anggota_id === a.id ? 'selected' : ''}>${esc(a.nama)}</option>`).join('')}</select></div></div>
+          ${u ? '' : `<div class="grid-2" id="a_baruAgt"><div class="field"><label for="a_nip">NIP / NUPTK <span class="muted">(opsional)</span></label><input class="input tabnum" id="a_nip" name="nip" inputmode="numeric" maxlength="20"><div class="err"></div></div>
+            <div class="field"><label for="a_skl">Sekolah <span class="muted">(opsional)</span></label>${UI.kolomSekolah({ id: 'a_skl', nama: 'sekolah' })}<div class="err"></div></div></div>
+            <p class="help" id="a_baruInfo" style="margin:-4px 0 12px">Akun baru otomatis masuk menu <b>Data Anggota</b> (bisa membayar iuran). Pilih nama di atas bila orangnya sudah ada di Data Anggota.</p>`}
           <label class="check"><input type="checkbox" name="status_aktif" ${!u || u.status_aktif ? 'checked' : ''}> <span>Akun aktif (dapat login)</span></label></form>`,
         foot: '<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="aSimpan"><i class="bi bi-save"></i> Simpan</button>',
         onOpen: (m, close) => {
@@ -627,6 +664,13 @@
           $$('[data-m]', m).forEach((b) => b.onclick = () => setMode(b.dataset.m));
           setMode(mode);
           if ($('#a_acak', m)) $('#a_acak', m).onclick = () => { $('#a_sandi', m).value = sandiAcak(); };
+          if (!u) {
+            const fa = $('#aForm', m);
+            UI.pasangSaranSekolah(fa.sekolah);
+            fa.nip.oninput = () => { fa.nip.value = fa.nip.value.replace(/\D/g, ''); };
+            const tog = () => { const baru = !fa.anggota_id.value; $('#a_baruAgt', m).hidden = !baru; $('#a_baruInfo', m).hidden = !baru; };
+            fa.anggota_id.onchange = tog; tog();
+          }
           $('#aSimpan', m).onclick = async () => {
             const f = $('#aForm', m);
             const aturan = { nama: (v) => v.length < 3 ? 'Nama wajib diisi.' : '' };
@@ -635,19 +679,34 @@
               aturan.username = (v) => !/^[a-z0-9._-]{3,30}$/.test(v.trim().toLowerCase()) ? 'Username 3–30 karakter: huruf kecil, angka, titik, _ atau -.' : '';
               if (f.sandi) aturan.sandi = (v) => !sandiValid(v.trim()) ? 'Minimal 8 karakter, memuat huruf dan angka.' : '';
             }
+            if (!u && !f.anggota_id.value) {
+              aturan.nip = (v) => v && !/^\d{8,20}$/.test(v) ? 'NIP/NUPTK berupa angka 8–20 digit.' : '';
+              aturan.sekolah = (v) => UI.cekSekolah(v, false);
+            }
             if (!validasi(f, aturan)) return;
             const username = f.username.value.trim().toLowerCase();
             const email = mode === 'google' ? f.email.value.trim().toLowerCase() : username + DOM;
             const btn = $('#aSimpan', m); btn.disabled = true;
             try {
-              const baris = { id: u && u.id, nama: f.nama.value.trim(), email, role: f.role.value, anggota_id: f.anggota_id.value || null, status_aktif: f.status_aktif.checked,
+              let anggotaId = f.anggota_id.value || null;
+              // Akun baru tanpa pilihan anggota → buat Data Anggota (pakai yang sudah ada bila NIP sama)
+              if (!u && !anggotaId) {
+                const nip = f.nip.value.trim();
+                const sama = nip && agt.find((a) => a.nip === nip);
+                if (sama) anggotaId = sama.id;
+                else if (nip || UI.rapikanSekolah(f.sekolah.value)) {
+                  anggotaId = (await Data.buatAnggotaAkun({ nama: f.nama.value.trim(), email: mode === 'google' ? email : null, nip, sekolah: f.sekolah.value })).id;
+                }   // tanpa NIP & sekolah: database membuat Data Anggota otomatis
+              }
+              const baris = { id: u && u.id, nama: f.nama.value.trim(), email, role: f.role.value, anggota_id: anggotaId, status_aktif: f.status_aktif.checked,
                 metode_login: mode === 'username' ? 'sandi' : (u ? u.metode_login : 'google') };
               await Data.simpanPengguna(baris);
               if (mode === 'username' && f.sandi) {
                 const sandi = f.sandi.value.trim();
                 try { const r = await Data.aturSandi(email, sandi); close(); tampilkanSandi(baris, username, sandi, (r && r.message) || 'Akun dibuat.'); }
                 catch (e) { close(); toast('Akun tersimpan, tetapi kata sandi gagal dibuat: ' + e.message + ' — coba lagi lewat tombol kunci.', 'error', 9000); }
-              } else { close(); toast(u ? 'Akun diperbarui.' : 'Akun ditambahkan. Pengguna kini dapat masuk dengan Google.', 'success'); }
+              } else { close(); toast(u ? 'Akun diperbarui.' : 'Akun ditambahkan dan tercatat di Data Anggota. Pengguna kini dapat masuk dengan Google.', 'success'); }
+              Data.clearDashCache();
               muat();
             } catch (e) { toast(e.message, 'error'); btn.disabled = false; }
           };
@@ -696,12 +755,53 @@
   Router.add(/^\/berita\/([\w-]+)$/, (m) => P.beritaDetail(m));
   Router.add(/^\/dokumentasi\/([\w-]+)$/, (m) => P.albumPublik(m));
 
+  // ------------------------------------------------------------------
+  // WAJIB GANTI KATA SANDI (masuk pertama kali dengan sandi sementara)
+  // ------------------------------------------------------------------
+  function halamanWajibSandi() {
+    destroyCharts();
+    const p = Auth.profil;
+    $('#root').innerHTML = `<div class="container" style="max-width:520px;padding:40px 16px">
+      <div class="card"><div style="display:flex;gap:14px;align-items:center;margin-bottom:14px"><span class="icon-tile amber"><i class="bi bi-shield-lock"></i></span>
+        <div><h1 style="font-size:21px">Buat Kata Sandi Baru</h1><p class="muted body-sm">${esc(p.nama)} · ${esc(p.email)}</p></div></div>
+        <div class="alert info" style="margin-bottom:16px"><i class="bi bi-info-circle"></i><div>Anda masuk dengan <b>kata sandi sementara</b> dari email. Demi keamanan, buat kata sandi baru sebelum melanjutkan.</div></div>
+        <form id="wsForm" novalidate>
+          <div class="field"><label for="ws1">Kata sandi baru</label><div class="pass-wrap"><input class="input" id="ws1" name="baru" type="password" autocomplete="new-password">
+            <button type="button" class="btn btn-ghost btn-icon" id="wsLihat" aria-label="Tampilkan kata sandi"><i class="bi bi-eye"></i></button></div><div class="err"></div>
+            <span class="help">Minimal 8 karakter, memuat huruf dan angka. Jangan sama dengan kata sandi sementara.</span></div>
+          <div class="field"><label for="ws2">Ulangi kata sandi baru</label><input class="input" id="ws2" name="ulang" type="password" autocomplete="new-password"><div class="err"></div></div>
+          <button class="btn btn-primary btn-block" id="wsGo" style="min-height:48px"><i class="bi bi-check2-circle"></i> Simpan & Lanjutkan</button>
+          <button type="button" class="btn btn-ghost btn-block" id="wsKeluar" style="margin-top:8px"><i class="bi bi-box-arrow-right"></i> Keluar</button>
+        </form></div></div>`;
+    const ld = $('#loader'); if (ld) { ld.classList.add('done'); setTimeout(() => ld.remove(), 350); }
+    const f = $('#wsForm');
+    $('#wsLihat').onclick = () => { const t = f.baru.type === 'password' ? 'text' : 'password'; f.baru.type = t; f.ulang.type = t; };
+    $('#wsKeluar').onclick = async () => { await Auth.logout(); Router.go('/masuk'); };
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const ok = validasi(f, {
+        baru: (v) => v.length < 8 || !/[A-Za-z]/.test(v) || !/[0-9]/.test(v) ? 'Minimal 8 karakter, memuat huruf dan angka.' : '',
+        ulang: (v) => v !== f.baru.value ? 'Ulangi kata sandi yang sama.' : ''
+      });
+      if (!ok) return;
+      const btn = $('#wsGo'); btn.disabled = true;
+      try {
+        await Auth.gantiSandi(f.baru.value);
+        Auth.profil.wajib_ganti_sandi = false;
+        toast('Kata sandi baru tersimpan. Gunakan kata sandi ini saat masuk berikutnya.', 'success', 5000);
+        Router.go('/app/dashboard');
+      } catch (err) { toast(err.message, 'error', 6000); btn.disabled = false; }
+    };
+  }
+
+
   // Registri halaman: modul batch lain menambah lewat window.AppPages
   const HAL = window.AppPages = Object.assign(window.AppPages || {}, { dashboard, pengaturan, akun, notifikasi });
   // Perkakas bersama untuk modul halaman
   window.AppKit = { shell, chart, warna, destroyCharts, boleh, muatBadge, segera, ITEM };
   Router.add(/^\/app\/([\w-]+)$/, async ([id]) => {
     if (!Auth.profil) return Router.go('/masuk');
+    if (Auth.profil.wajib_ganti_sandi) return halamanWajibSandi();
     if (id !== 'profil' && !boleh(id)) { toast('Menu ini tidak tersedia untuk peran Anda.', 'warning'); return Router.go('/app/dashboard'); }
     return HAL[id] ? HAL[id](Router.query()) : segera(id);
   });
