@@ -309,8 +309,9 @@
             <div class="field"><label for="nip">NIP (18 digit) <span class="req">*</span></label>
               <input class="input tabnum" id="nip" name="nip" inputmode="numeric" maxlength="20" placeholder="198705122010011008"><div class="err"></div>
               <span class="help">Non-PNS dapat mengisi NUPTK.</span></div>
-            <div class="field"><label for="email">Email Google <span class="req">*</span></label>
-              <input class="input" id="email" name="email" type="email" placeholder="nama.anda@gmail.com" autocomplete="email"><div class="err"></div></div>
+            <div class="field"><label for="email">Email Aktif (Gmail) <span class="req">*</span></label>
+              <input class="input" id="email" name="email" type="email" placeholder="nama.anda@gmail.com" autocomplete="email"><div class="err"></div>
+              <span class="help">Setelah disetujui, <b>username & kata sandi</b> dikirim ke email ini.</span></div>
           </div>
           <div class="grid-2">
             <div class="field"><label for="sekolah">Sekolah Induk <span class="req">*</span></label>
@@ -326,7 +327,7 @@
             <input type="file" id="foto" name="foto" accept="image/jpeg,image/png" class="sr-only"><div class="err"></div></div>
           <div class="field"><label class="check"><input type="checkbox" name="setuju"> <span>Saya menyatakan data di atas benar dan bersedia mematuhi AD/ART serta ketentuan organisasi KKG PJOK Tegal Timur.</span></label><div class="err"></div></div>
           <button class="btn btn-primary btn-block" type="submit" id="dfBtn" style="min-height:52px"><i class="bi bi-send"></i> Kirim Pendaftaran Anggota</button>
-          <p class="body-sm muted" style="text-align:center;margin-top:14px">Sudah memiliki akun aktif? <a href="#/masuk">Masuk dengan Google</a></p>
+          <p class="body-sm muted" style="text-align:center;margin-top:14px">Sudah memiliki akun aktif? <a href="#/masuk">Masuk di sini</a></p>
         </form>
       </div></div>`);
 
@@ -368,11 +369,12 @@
         const up = await Data.uploadPendaftaran({ base64: foto.base64, mime: foto.mime, nama: foto.nama, dataUrl: foto.dataUrl });
         await Data.daftar({ nama: form.nama.value.trim(), nip: form.nip.value.trim(), email: form.email.value.trim().toLowerCase(),
           sekolah: UI.rapikanSekolah(form.sekolah.value), no_hp: form.no_hp.value.trim() || null, foto_url: up && up.url && !String(up.url).startsWith('data:') ? up.url : null });
+        Data.konfirmasiDaftar(form.email.value.trim().toLowerCase()).catch((e) => console.warn('[KKG] email konfirmasi:', e.message));
         $('#dfCard').innerHTML = `<div style="text-align:center;padding:24px 0" class="fade-in">
           <div class="ill" style="width:84px;height:84px;margin:0 auto 18px;border-radius:50%;display:grid;place-items:center;background:var(--b-green-bg);color:var(--b-green-tx);font-size:40px"><i class="bi bi-check-lg"></i></div>
-          <h2 class="h-lg">Pendaftaran Terkirim</h2><p class="muted" style="margin-top:8px">Status Anda: <span class="badge b-amber">Menunggu Verifikasi</span></p>
-          <div class="stepper"><span class="st done"><i>✓</i>Diajukan</span><span class="sep"></span><span class="st"><i>2</i>Diverifikasi Ketua/Sekretaris</span><span class="sep"></span><span class="st"><i>3</i>Akun Diaktifkan Admin IT</span></div>
-          <p class="body-sm muted" style="margin-top:20px">Pemberitahuan dikirim ke email Anda setelah akun aktif.</p>
+          <h2 class="h-lg">Pendaftaran Terkirim</h2><p class="muted" style="margin-top:8px">Status Anda: <span class="badge b-amber">Menunggu Persetujuan</span></p>
+          <div class="stepper"><span class="st done"><i>✓</i>Diajukan</span><span class="sep"></span><span class="st"><i>2</i>Disetujui Pengurus</span><span class="sep"></span><span class="st"><i>3</i>Username & Sandi via Email</span></div>
+          <p class="body-sm muted" style="margin-top:20px">Setelah disetujui, <b>username & kata sandi</b> dikirim ke <b>${esc(form.email.value.trim().toLowerCase())}</b>. Periksa juga folder Spam.</p>
           <a class="btn btn-primary" style="margin-top:20px" href="#/">Kembali ke Beranda</a></div>`;
         window.scrollTo(0, 0);
       } catch (err) {
