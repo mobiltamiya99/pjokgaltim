@@ -974,3 +974,6 @@ a.news-card { display: flex; }
 
 /* Kolom sekolah: input ketik manual + saran (datalist) — sembunyikan panah agar tidak terlihat seperti pilihan wajib */
 input[list]::-webkit-calendar-picker-indicator { display: none !important; opacity: 0; }
+/* Spinner kecil di tombol / modal */
+.spin { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; vertical-align: -3px; }
+body:has(.modal-backdrop) .demo-bar { display: none; }
