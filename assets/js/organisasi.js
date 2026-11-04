@@ -382,40 +382,45 @@
   // ==================================================================
   // PENDAFTARAN & AKTIVASI
   // ==================================================================
-  const ST_DAFTAR = { menunggu: ['b-amber', 'Menunggu Verifikasi'], disetujui: ['b-navy', 'Menunggu Aktivasi'], aktif: ['b-green', 'Akun Aktif'], ditolak: ['b-red', 'Ditolak'] };
+  const ST_DAFTAR = { menunggu: ['b-amber', 'Menunggu Persetujuan'], disetujui: ['b-navy', 'Belum Diaktifkan'], aktif: ['b-green', 'Akun Aktif'], ditolak: ['b-red', 'Ditolak'] };
   const badgeDaftar = (s) => `<span class="badge ${ST_DAFTAR[s][0]}">${s === 'menunggu' ? '<span class="dot pulse"></span>' : ''}${ST_DAFTAR[s][1]}</span>`;
 
   async function halPendaftaran() {
-    const el = await shell('pendaftaran', 'Pendaftaran Anggota', 'Verifikasi pendaftar & aktivasi akun');
-    const pemutus = adalah('ketua', 'sekretaris');
+    const el = await shell('pendaftaran', 'Pendaftaran Anggota', 'Persetujuan anggota baru');
+    const pemutus = adalah('admin_it', 'ketua', 'sekretaris');
     const admin = adalah('admin_it');
-    const st = { tab: admin ? 'disetujui' : 'menunggu', cari: '', halaman: 1, per: 10, urut: 'dibuat_pada', naik: false };
-    el.innerHTML = `<div class="page-head"><div><h1>Verifikasi Pendaftaran & Aktivasi Akun</h1>
-        <p>Alur: pendaftar mengisi formulir → <b>Ketua/Sekretaris</b> memverifikasi → <b>Admin IT</b> mengaktifkan akun & menetapkan peran.</p></div></div>
+    const st = { tab: 'menunggu', cari: '', halaman: 1, per: 10, urut: 'dibuat_pada', naik: false };
+    el.innerHTML = `<div class="page-head"><div><h1>Persetujuan Anggota Baru</h1>
+        <p>Alur: pendaftar mengisi formulir → <b>Admin IT, Ketua, atau Sekretaris</b> menyetujui → akun langsung aktif dan <b>username & kata sandi dikirim otomatis ke email</b> pendaftar.</p></div></div>
       <div class="chip-tabs" id="dTabs" role="tablist"></div>
       <div class="card" style="padding:16px;margin-bottom:16px"><div class="toolbar" style="margin:0"><div class="search"><i class="bi bi-search"></i><input class="input" id="dCari" placeholder="Cari nama, NIP, email, sekolah…" aria-label="Cari pendaftar"></div></div></div>
       <div id="dTabel"></div>`;
     let data = [];
-    const TABS = [['menunggu', 'Menunggu Verifikasi'], ['disetujui', 'Menunggu Aktivasi'], ['aktif', 'Akun Aktif'], ['ditolak', 'Ditolak'], ['', 'Semua']];
+    const TABS = [['menunggu', 'Menunggu Persetujuan'], ['disetujui', 'Belum Diaktifkan'], ['aktif', 'Disetujui & Aktif'], ['ditolak', 'Ditolak'], ['', 'Semua']];
     const renderTabs = () => {
-      $('#dTabs').innerHTML = TABS.map(([k, l]) => { const n = k ? data.filter((d) => d.status === k).length : data.length;
+      $('#dTabs').innerHTML = TABS.filter(([k]) => k !== 'disetujui' || data.some((d) => d.status === 'disetujui')).map(([k, l]) => { const n = k ? data.filter((d) => d.status === k).length : data.length;
         return `<button role="tab" aria-selected="${st.tab === k}" class="${st.tab === k ? 'active' : ''}" data-tab="${k}">${l} <span class="n">${n}</span></button>`; }).join('');
       $$('#dTabs [data-tab]').forEach((b) => b.onclick = () => { st.tab = b.dataset.tab; renderTabs(); t.muat(true); });
     };
+    const lihatBtn = (d) => `<button class="btn btn-ghost btn-icon" data-tinjau="${esc(d.id)}" aria-label="Lihat detail" title="Lihat detail"><i class="bi bi-eye"></i></button>`;
     const t = UI.tabel({
       el: $('#dTabel'), state: st,
       kosong: { judul: 'Tidak ada pendaftaran', pesan: 'Pendaftaran baru dari website akan muncul di sini.', ikon: 'bi-person-plus' },
       kolom: [
         { key: 'nama', label: 'Pendaftar', sort: true, render: (d) => `<div style="display:flex;gap:10px;align-items:center">${avatar(d.nama, d.foto_url)}<div><b>${esc(d.nama)}</b><div class="body-sm muted">${esc(d.no_hp || 'Tanpa No. HP')}</div></div></div>` },
         { key: 'nip', label: 'NIP / NUPTK', cls: 'tabnum' },
-        { key: 'email', label: 'Email Google', sort: true },
+        { key: 'email', label: 'Email', sort: true },
         { key: 'sekolah', label: 'Sekolah', sort: true },
         { key: 'dibuat_pada', label: 'Tanggal Daftar', sort: true, render: (d) => `${fmt.tglPendek(d.dibuat_pada)}<div class="body-sm muted">${fmt.relatif(d.dibuat_pada)}</div>` },
         { key: 'status', label: 'Status', render: (d) => badgeDaftar(d.status) }
       ],
-      aksi: (d) => pemutus && d.status === 'menunggu' ? `<button class="btn btn-primary btn-sm" data-tinjau="${esc(d.id)}"><i class="bi bi-search"></i> Tinjau</button>`
-        : admin && d.status === 'disetujui' ? `<button class="btn btn-sm btn-teal-solid" data-aktif="${esc(d.id)}"><i class="bi bi-person-check"></i> Aktifkan Akun</button>`
-        : `<button class="btn btn-ghost btn-icon" data-tinjau="${esc(d.id)}" aria-label="Lihat detail"><i class="bi bi-eye"></i></button>`,
+      aksi: (d) => {
+        if (!pemutus) return lihatBtn(d);
+        if (d.status === 'menunggu') return `<button class="btn btn-primary btn-sm" data-tinjau="${esc(d.id)}"><i class="bi bi-search"></i> Tinjau</button>`;
+        if (d.status === 'disetujui') return `<button class="btn btn-sm btn-teal-solid" data-aktif="${esc(d.id)}"><i class="bi bi-person-check"></i> Aktifkan & Kirim Akun</button>`;
+        if (d.status === 'aktif') return `${lihatBtn(d)}<button class="btn btn-ghost btn-icon" data-ulang="${esc(d.id)}" aria-label="Kirim ulang username & kata sandi" title="Kirim ulang username & kata sandi"><i class="bi bi-envelope-arrow-up"></i></button>`;
+        return lihatBtn(d);
+      },
       muat: async (s) => {
         if (!data.length || s._segar) { data = await Data.pendaftaran(); s._segar = false; renderTabs(); }
         const r = UI.saringLokal(data, s, { cari: ['nama', 'nip', 'email', 'sekolah'], filter: { tab: (x, v) => x.status === v } });
@@ -424,6 +429,7 @@
       onRender: (rows) => {
         $$('[data-tinjau]').forEach((b) => b.onclick = () => tinjau(rows.find((r) => r.id === b.dataset.tinjau)));
         $$('[data-aktif]').forEach((b) => b.onclick = () => aktivasi(rows.find((r) => r.id === b.dataset.aktif)));
+        $$('[data-ulang]').forEach((b) => b.onclick = () => kirimUlang(rows.find((r) => r.id === b.dataset.ulang)));
       }
     });
     $('#dCari').oninput = debounce((e) => { st.cari = e.target.value; t.muat(true); }, 250);
@@ -432,17 +438,18 @@
     function tinjau(d) {
       const bisa = pemutus && d.status === 'menunggu';
       modal({
-        judul: bisa ? 'Verifikasi Pendaftaran' : 'Detail Pendaftaran', wide: true,
+        judul: bisa ? 'Persetujuan Anggota Baru' : 'Detail Pendaftaran', wide: true,
         isi: `<div style="display:flex;gap:20px;flex-wrap:wrap">
             <div style="flex:none">${d.foto_url ? `<img src="${esc(d.foto_url)}" alt="Foto ${esc(d.nama)}" style="width:150px;height:150px;object-fit:cover;border-radius:16px;border:1px solid var(--border)" referrerpolicy="no-referrer">` : `<div class="avatar lg" style="width:150px;height:150px;border-radius:16px;font-size:40px">${esc(fmt.inisial(d.nama))}</div>`}</div>
             <div style="flex:1;min-width:240px">${badgeDaftar(d.status)}<h3 style="font-size:20px;margin:10px 0 14px">${esc(d.nama)}</h3>
-              <dl class="kv"><dt>NIP / NUPTK</dt><dd class="tabnum">${esc(d.nip)}</dd><dt>Email Google</dt><dd>${esc(d.email)}</dd><dt>Sekolah</dt><dd>${esc(d.sekolah)}</dd>
+              <dl class="kv"><dt>NIP / NUPTK</dt><dd class="tabnum">${esc(d.nip)}</dd><dt>Email</dt><dd>${esc(d.email)}</dd><dt>Sekolah</dt><dd>${esc(d.sekolah)}</dd>
                 <dt>No. WhatsApp</dt><dd>${esc(d.no_hp || '—')}</dd><dt>Tanggal daftar</dt><dd>${fmt.tgl(d.dibuat_pada)}</dd>
                 ${d.catatan ? `<dt>Catatan keputusan</dt><dd>${esc(d.catatan)}<br><small class="muted">${fmt.tgl(d.diputus_pada)}</small></dd>` : ''}</dl></div></div>
           ${bisa ? `<div class="field" style="margin:24px 0 0"><label for="dCat">Catatan keputusan <span class="req">*</span></label>
             <textarea class="textarea" id="dCat" style="min-height:90px" placeholder="Contoh: Data sesuai SK tugas, NIP terverifikasi."></textarea><div class="err"><i class="bi bi-exclamation-circle"></i>Minimal 5 karakter.</div>
-            <span class="help">Catatan tersimpan di riwayat. Jika ditolak, catatan dikirim ke email pendaftar.</span></div>` : ''}`,
-        foot: bisa ? `<button class="btn btn-danger-outline" data-k="0"><i class="bi bi-x-circle"></i> Tolak</button><button class="btn btn-success" data-k="1"><i class="bi bi-check2-circle"></i> Setujui</button>` : '<button class="btn btn-ghost" data-close>Tutup</button>',
+            <span class="help">Catatan tersimpan di riwayat. Jika ditolak, catatan dikirim ke email pendaftar.</span></div>
+            <div class="alert info" style="margin-top:14px"><i class="bi bi-envelope-check"></i><div>Jika <b>disetujui</b>: akun langsung aktif sebagai <b>Anggota</b>, lalu <b>username & kata sandi</b> dikirim otomatis ke <b>${esc(d.email)}</b>.</div></div>` : ''}`,
+        foot: bisa ? `<button class="btn btn-danger-outline" data-k="0"><i class="bi bi-x-circle"></i> Tolak</button><button class="btn btn-success" data-k="1"><i class="bi bi-check2-circle"></i> Setujui & Kirim Akun</button>` : '<button class="btn btn-ghost" data-close>Tutup</button>',
         onOpen: (m, close) => {
           $$('[data-k]', m).forEach((b) => b.onclick = async () => {
             const setuju = b.dataset.k === '1';
@@ -450,30 +457,75 @@
             if (cat.length < 5) { $('#dCat', m).closest('.field').classList.add('invalid'); $('#dCat', m).focus(); return; }
             if (!setuju) { const k = await konfirmasi({ judul: 'Tolak pendaftaran?', bahaya: true, ok: 'Ya, tolak', pesan: `Pendaftaran <b>${esc(d.nama)}</b> akan ditolak dan pendaftar diberi tahu lewat email.` }); if (!k.ok) return; }
             $$('[data-k]', m).forEach((x) => { x.disabled = true; });
-            try { await Data.putuskanPendaftaran(d.id, setuju, cat); close(); toast(setuju ? `${d.nama} disetujui. Admin IT diberi tahu untuk aktivasi.` : 'Pendaftaran ditolak.', 'success'); segarkan(); }
-            catch (e) { toast(e.message, 'error'); $$('[data-k]', m).forEach((x) => { x.disabled = false; }); }
+            b.innerHTML = '<span class="spin"></span> Memproses…';
+            try {
+              await Data.putuskanPendaftaran(d.id, setuju, cat);
+              close(); segarkan();
+              if (setuju) kirimAkun(d); else toast('Pendaftaran ditolak. Pendaftar diberi tahu lewat email.', 'success');
+            } catch (e) { toast(e.message, 'error'); $$('[data-k]', m).forEach((x) => { x.disabled = false; }); b.innerHTML = setuju ? '<i class="bi bi-check2-circle"></i> Setujui & Kirim Akun' : '<i class="bi bi-x-circle"></i> Tolak'; }
           });
         }
       });
     }
 
+    // Pendaftaran lama yang sudah disetujui tetapi belum diaktifkan
     function aktivasi(d) {
       modal({
-        judul: 'Aktivasi Akun & Penetapan Peran',
+        judul: 'Aktifkan Akun & Kirim Username',
         isi: `<div style="display:flex;gap:14px;align-items:center;padding:14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">${avatar(d.nama, d.foto_url)}
             <div><b>${esc(d.nama)}</b><div class="body-sm muted">${esc(d.email)} · ${esc(d.sekolah)}</div></div></div>
-          <div class="field" style="margin-top:18px"><label for="aRole">Peran Akses</label><select class="select" id="aRole">${Object.entries(ROLE_LABEL).map(([k, v]) => `<option value="${k}" ${k === 'anggota' ? 'selected' : ''}>${v}</option>`).join('')}</select>
-            <span class="help">Peran pengurus hanya diberikan sesuai SK kepengurusan.</span></div>
-          <div class="alert info"><i class="bi bi-envelope-check"></i><div>Data anggota & akun dibuat otomatis, lalu email pemberitahuan aktivasi dikirim ke <b>${esc(d.email)}</b>.</div></div>`,
-        foot: '<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="aGo"><i class="bi bi-person-check"></i> Konfirmasi & Aktifkan</button>',
+          ${admin ? `<div class="field" style="margin-top:18px"><label for="aRole">Peran Akses</label><select class="select" id="aRole">${Object.entries(ROLE_LABEL).map(([k, v]) => `<option value="${k}" ${k === 'anggota' ? 'selected' : ''}>${v}</option>`).join('')}</select>
+            <span class="help">Peran pengurus hanya diberikan sesuai SK kepengurusan.</span></div>` : '<p class="help" style="margin-top:14px">Akun dibuat dengan peran <b>Anggota</b>.</p>'}
+          <div class="alert info"><i class="bi bi-envelope-check"></i><div>Username & kata sandi dikirim ke <b>${esc(d.email)}</b>.</div></div>`,
+        foot: '<button class="btn btn-ghost" data-close>Batal</button><button class="btn btn-primary" id="aGo"><i class="bi bi-person-check"></i> Aktifkan & Kirim</button>',
         onOpen: (m, close) => {
           $('#aGo', m).onclick = async () => {
             $('#aGo', m).disabled = true;
-            try { await Data.aktivasiAkun(d.id, $('#aRole', m).value); close(); toast(`Akun ${d.nama} aktif. Ia kini dapat masuk dengan Google.`, 'success'); segarkan(); }
+            try { await Data.aktivasiAkun(d.id, admin ? $('#aRole', m).value : 'anggota'); close(); segarkan(); kirimAkun(d); }
             catch (e) { toast(e.message, 'error'); $('#aGo', m).disabled = false; }
           };
         }
       });
+    }
+
+    async function kirimUlang(d) {
+      const k = await konfirmasi({ judul: 'Kirim ulang username & kata sandi?', ok: 'Ya, kirim ulang',
+        pesan: `Kata sandi baru dibuat untuk <b>${esc(d.nama)}</b> lalu dikirim ke <b>${esc(d.email)}</b>. Kata sandi lama langsung tidak berlaku.` });
+      if (k.ok) kirimAkun(d, true);
+    }
+
+    // Buat kata sandi + kirim ke email anggota (lewat Google Apps Script), lalu tampilkan hasilnya
+    async function kirimAkun(d, ulang) {
+      const tunggu = modal({ judul: ulang ? 'Mengirim Ulang Akun' : 'Anggota Disetujui',
+        isi: `<div style="text-align:center;padding:18px 0"><span class="spin" style="width:28px;height:28px"></span><p style="margin-top:14px">Membuat kata sandi & mengirim email ke <b>${esc(d.email)}</b>…</p></div>`, foot: '' });
+      let r = null, galat = '';
+      try { r = await Data.kirimAkun(d.id); } catch (e) {
+        galat = e.message;
+        if (/Aksi tidak dikenal/i.test(galat)) galat += ' → Google Apps Script belum diperbarui: tempel Kode.gs terbaru, lalu Deploy → Manage deployments → Edit → New version → Deploy.';
+        else if (/Failed to fetch|NetworkError|Load failed/i.test(galat)) galat += ' → Periksa GAS_URL di config.js dan koneksi internet.';
+      }
+      if (tunggu && tunggu.close) tunggu.close(); else $$('.modal [data-close]').forEach((x) => x.click());
+      if (!r) {
+        modal({ judul: 'Akun Aktif, Email Belum Terkirim',
+          isi: `<div class="alert warning"><i class="bi bi-exclamation-triangle"></i><div>${ulang ? '' : `<b>${esc(d.nama)}</b> sudah disetujui dan akunnya aktif. `}Namun username & kata sandi <b>gagal dibuat/dikirim</b>.<br><small>${esc(galat)}</small></div></div>
+            <p class="help" style="margin-top:12px">Periksa koneksi internet & pengaturan Google Apps Script, lalu tekan <b>Coba Lagi</b>. Tombol <i class="bi bi-envelope-arrow-up"></i> di tab <b>Disetujui & Aktif</b> juga bisa dipakai kapan saja.</p>`,
+          foot: '<button class="btn btn-ghost" data-close>Tutup</button><button class="btn btn-primary" id="kaUlang"><i class="bi bi-arrow-repeat"></i> Coba Lagi</button>',
+          onOpen: (m, close) => { $('#kaUlang', m).onclick = () => { close(); kirimAkun(d, ulang); }; } });
+        return;
+      }
+      const info = r.data || {};
+      const alamat = location.origin + location.pathname;
+      const teks = `Akun KKG PJOK Tegal Timur\n${alamat}#/masuk\nPilih: Username & Sandi\nUsername: ${info.username}\nKata sandi: ${info.sandi}\n(Segera ganti kata sandi di Profil Saya)`;
+      const wa = String(d.no_hp || '').replace(/\D/g, '').replace(/^0/, '62');
+      modal({ judul: info.terkirim ? 'Username & Kata Sandi Terkirim' : 'Akun Aktif — Email Gagal Terkirim',
+        isi: `<div class="alert ${info.terkirim ? 'success' : 'warning'}" style="margin-bottom:14px"><i class="bi ${info.terkirim ? 'bi-envelope-check' : 'bi-exclamation-triangle'}"></i>
+            <div>${info.terkirim ? `${ulang ? 'Kata sandi baru' : `<b>${esc(d.nama)}</b> disetujui. Username & kata sandi`} sudah dikirim ke <b>${esc(d.email)}</b>.` : `Email gagal dikirim (${esc(info.galat || r.message)}). Berikan data di bawah secara pribadi, misalnya lewat WhatsApp.`}</div></div>
+          <dl class="kv" style="margin:12px 0"><dt>Username</dt><dd><b>${esc(info.username)}</b></dd></dl>
+          <div class="label-sm muted" style="margin-bottom:6px">Kata sandi</div><div class="sandi-box">${esc(info.sandi)}</div>
+          <p class="help" style="margin-top:10px">Kata sandi ini hanya tampil sekali dan tidak disimpan di database. Cadangan bila anggota tidak menerima email (cek juga folder Spam).</p>`,
+        foot: `<button class="btn btn-outline" id="kaSalin"><i class="bi bi-clipboard"></i> Salin</button>${wa.length >= 10 ? `<a class="btn btn-outline" id="kaWa" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(teks)}"><i class="bi bi-whatsapp"></i> WhatsApp</a>` : ''}<button class="btn btn-primary" data-close>Selesai</button>`,
+        onOpen: (m) => { $('#kaSalin', m).onclick = async () => {
+          try { await navigator.clipboard.writeText(teks); toast('Informasi login disalin.', 'success'); } catch (e) { toast('Salin manual dari kotak di atas.', 'info'); } }; } });
     }
   }
 
