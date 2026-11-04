@@ -160,7 +160,14 @@
     async gantiSandi(baru) {
       if (String(baru).length < 8 || !/[A-Za-z]/.test(baru) || !/[0-9]/.test(baru)) throw new Error('Kata sandi minimal 8 karakter dan memuat huruf serta angka.');
       const { error } = await sb.auth.updateUser({ password: baru });
-      if (error) throw new Error(/same/i.test(error.message) ? 'Kata sandi baru harus berbeda dari yang lama.' : error.message);
+      if (error) {
+        const m = error.message || '';
+        if (/same|different/i.test(m)) throw new Error('Kata sandi baru harus berbeda dari kata sandi sementara.');
+        if (/reauth|recent/i.test(m)) throw new Error('Demi keamanan, keluar lalu masuk kembali, kemudian ganti kata sandi.');
+        throw new Error(m);
+      }
+      try { await sb.rpc('sandi_sudah_diganti'); } catch (e) { /* tidak kritis */ }
+      if (Auth.profil) Auth.profil.wajib_ganti_sandi = false;
     },
 
     async logout() {
@@ -294,6 +301,10 @@
       const r = await q(sb.rpc('aktivasi_akun', { p_pendaftaran_id: id, p_role: role }));
       Data.clearDashCache(); return r;
     },
+    // Buat kata sandi + kirim username & kata sandi ke email anggota baru (Google Apps Script)
+    kirimAkun: (id) => GAS.post('kirimAkun', { pendaftaran_id: id, situs: location.origin + location.pathname }),
+    // Email "pendaftaran diterima" ke pendaftar + pemberitahuan ke Admin IT/Ketua/Sekretaris
+    konfirmasiDaftar: (email) => GAS.post('konfirmasiDaftar', { email, situs: location.origin + location.pathname }, true),
 
     // ---------- BATCH 2: pengajuan ----------
     pengajuanDaftar: (milikSaya = false) => q(sb.rpc('daftar_pengajuan', { p_milik_saya: milikSaya })),
